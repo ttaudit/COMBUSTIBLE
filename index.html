@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TT Audit – Reporte de Combustible BI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0f14;--s1:#141720;--s2:#1a1e2a;--bd:#262c3a;--ac:#4af0a8;--ac2:#f0a84a;--ac3:#4a8af0;--ac4:#f04a8a;--tx:#e8eaf2;--mu:#6b7280;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--tx);font-family:'DM Mono',monospace;min-height:100vh;font-size:13px;}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:var(--s1);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:200;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-ico{width:32px;height:32px;background:var(--ac);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo-txt{font-family:'Syne',sans-serif;font-weight:800;font-size:17px;letter-spacing:-.5px;}
+.logo-txt span{color:var(--ac);}
+.hdr-r{color:var(--mu);font-size:11px;}
+.hdr-r strong{color:var(--ac);}
+
+/* TABS */
+.tabs{display:flex;gap:3px;padding:12px 28px;background:var(--s1);border-bottom:1px solid var(--bd);overflow-x:auto;}
+.tb{padding:7px 18px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--mu);cursor:pointer;font-family:'Syne',sans-serif;font-weight:600;font-size:12px;transition:.2s;white-space:nowrap;}
+.tb:hover{color:var(--tx);border-color:var(--bd);}
+.tb.on{background:var(--ac);color:#0d0f14;border-color:var(--ac);}
+
+/* FILTERS */
+.fbar{display:flex;gap:10px;padding:12px 28px;background:var(--s2);border-bottom:1px solid var(--bd);flex-wrap:wrap;align-items:center;}
+.fl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;}
+.fsel{background:var(--s1);border:1px solid var(--bd);color:var(--tx);padding:6px 10px;border-radius:6px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;outline:none;min-width:130px;transition:.15s;}
+.fsel:focus,.fsel:hover{border-color:var(--ac);}
+.fbtn{padding:6px 14px;border-radius:6px;border:1px solid var(--ac);background:transparent;color:var(--ac);font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;transition:.15s;}
+.fbtn:hover{background:var(--ac);color:#0d0f14;}
+.finfo{font-size:10px;color:var(--mu);margin-left:auto;}
+.finfo strong{color:var(--tx);}
+
+/* MAIN */
+.main{padding:20px 28px;}
+.panel{display:none;}
+.panel.on{display:block;}
+
+/* KPI */
+.kgrid{display:grid;gap:10px;margin-bottom:18px;}
+.kgrid-6{grid-template-columns:repeat(6,1fr);}
+.kgrid-4{grid-template-columns:repeat(4,1fr);}
+.kgrid-3{grid-template-columns:repeat(3,1fr);}
+.kcard{background:var(--s1);border:1px solid var(--bd);border-radius:9px;padding:14px;position:relative;overflow:hidden;transition:.2s;}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--ac));}
+.klbl{font-size:9px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.kval{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;}
+.ksub{font-size:9px;color:var(--mu);margin-top:3px;}
+.green{color:var(--ac);}
+.orange{color:var(--ac2);}
+.blue{color:var(--ac3);}
+.pink{color:var(--ac4);}
+
+/* CHARTS */
+.crow{display:grid;gap:14px;margin-bottom:14px;}
+.c2{grid-template-columns:1fr 1fr;}
+.c3{grid-template-columns:1fr 1fr 1fr;}
+.c12{grid-template-columns:1fr 2fr;}
+.c21{grid-template-columns:2fr 1fr;}
+.ccard{background:var(--s1);border:1px solid var(--bd);border-radius:9px;padding:18px;}
+.ctitle{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;margin-bottom:2px;}
+.csub{font-size:9px;color:var(--mu);margin-bottom:12px;}
+.cleg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+.cli{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--mu);}
+.cdot{width:7px;height:7px;border-radius:50%;}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.tbl th{color:var(--mu);font-weight:500;text-align:left;padding:7px 9px;border-bottom:1px solid var(--bd);font-size:9px;text-transform:uppercase;letter-spacing:.05em;}
+.tbl td{padding:7px 9px;border-bottom:1px solid rgba(38,44,58,.4);}
+.tbl tr:hover td{background:var(--s2);}
+.tscroll{max-height:380px;overflow-y:auto;}
+.tscroll::-webkit-scrollbar{width:3px;}
+.tscroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px;}
+.bdg{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;}
+.bm{background:rgba(74,240,168,.15);color:var(--ac);}
+.bo{background:rgba(74,138,240,.15);color:var(--ac3);}
+.bs{background:rgba(240,168,74,.15);color:var(--ac2);}
+
+/* COND GRID */
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.ccard2{background:var(--s1);border:1px solid var(--bd);border-radius:9px;padding:12px;transition:.2s;}
+.ccard2:hover{border-color:var(--ac);}
+.cn{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;margin-bottom:8px;}
+.cc{font-size:9px;color:var(--mu);margin-bottom:6px;}
+.pbar{display:flex;height:5px;border-radius:3px;overflow:hidden;background:var(--s2);margin-bottom:6px;}
+.pgnv{background:var(--ac);}
+.pgas{background:var(--ac2);}
+.pdsl{background:var(--ac3);}
+.frow{display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px;}
+.ftype{color:var(--mu);}
+.fpct-g{color:var(--ac);font-weight:700;}
+.fpct-a{color:var(--ac2);font-weight:700;}
+.fpct-d{color:var(--ac3);font-weight:700;}
+
+/* MISC */
+.note{font-size:11px;color:var(--mu);line-height:1.7;margin-top:6px;}
+.note strong{color:var(--tx);}
+@media(max-width:1100px){.kgrid-6{grid-template-columns:repeat(3,1fr)}.c2,.c21,.c12{grid-template-columns:1fr}.c3{grid-template-columns:1fr 1fr}.cgrid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">
+    <div class="logo-ico">⚡</div>
+    <div class="logo-txt">TT<span>AUDIT</span> · Combustible BI</div>
+  </div>
+  <div class="hdr-r">2021–2026 &nbsp;·&nbsp; <strong id="h-records">616</strong> registros &nbsp;·&nbsp; <strong id="h-placas">28</strong> vehículos</div>
+</div>
+
+<div class="tabs">
+  <button class="tb on" onclick="setTab('resumen')">📊 Resumen</button>
+  <button class="tb" onclick="setTab('vehiculos')">🚗 Por Vehículo</button>
+  <button class="tb" onclick="setTab('trabajo')">🏷️ Tipo de Trabajo</button>
+  <button class="tb" onclick="setTab('conductores')">👤 Conductores</button>
+  <button class="tb" onclick="setTab('peajes')">🛣️ Peajes</button>
+</div>
+
+<div class="fbar">
+  <span class="fl">Filtros:</span>
+  <select class="fsel" id="f-year" onchange="applyFilters()">
+    <option value="all">Todos los años</option>
+    <option value="2022">2022</option>
+    <option value="2023">2023</option>
+    <option value="2024">2024</option>
+    <option value="2025">2025</option>
+    <option value="2026">2026</option>
+    <option value="2025-2026">2025–2026</option>
+    <option value="2023-2026">2023–2026</option>
+  </select>
+  <select class="fsel" id="f-mes" onchange="applyFilters()">
+    <option value="all">Todos los meses</option>
+  </select>
+  <select class="fsel" id="f-placa" onchange="applyFilters()">
+    <option value="all">Todas las placas</option>
+  </select>
+  <select class="fsel" id="f-tipo" onchange="applyFilters()">
+    <option value="all">Todos los tipos</option>
+    <option value="MERCH">MERCH</option>
+    <option value="OPERACIONES">OPERACIONES</option>
+    <option value="SUPERVISOR">SUPERVISOR</option>
+  </select>
+  <button class="fbtn" onclick="resetFilters()">↺ Limpiar</button>
+  <span class="finfo" id="finfo">Mostrando: <strong id="fi-n">616</strong> registros</span>
+</div>
+
+<div class="main">
+
+<!-- ======= RESUMEN ======= -->
+<div id="panel-resumen" class="panel on">
+  <div class="kgrid kgrid-6" id="kpis-r"></div>
+  <div class="crow c21">
+    <div class="ccard">
+      <div class="ctitle">Tendencia Mensual: KM · Gasto Combustible · Costo/KM</div>
+      <div class="csub">Peajes excluidos del cálculo de costo/km</div>
+      <div class="cleg">
+        <div class="cli"><div class="cdot" style="background:rgba(74,240,168,.5)"></div>KM</div>
+        <div class="cli"><div class="cdot" style="background:#f0a84a"></div>Combustible (S/)</div>
+        <div class="cli"><div class="cdot" style="background:#f04a8a"></div>Costo/KM</div>
+      </div>
+      <div id="ch-trend" style="height:310px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Consumo por Tipo de Trabajo</div>
+      <div class="csub">Distribución porcentual · filtro activo</div>
+      <div id="ch-pie" style="height:310px"></div>
+    </div>
+  </div>
+  <div class="crow c2">
+    <div class="ccard">
+      <div class="ctitle">Gasto por Tipo de Trabajo (Apilado)</div>
+      <div class="csub">S/ con IGV mensual</div>
+      <div id="ch-stack" style="height:260px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Costo/KM Mensual Promedio</div>
+      <div class="csub">S/ combustible ÷ KM · sin peajes</div>
+      <div id="ch-cxk" style="height:260px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= VEHÍCULOS ======= -->
+<div id="panel-vehiculos" class="panel">
+  <div class="crow c2">
+    <div class="ccard">
+      <div class="ctitle">Vehículo seleccionado</div>
+      <div class="csub">Análisis individual · filtra con el selector de placa arriba</div>
+      <select class="fsel" id="v-sel" style="margin-bottom:12px;min-width:220px" onchange="updateVehicle()">
+        <option value="">— seleccionar placa —</option>
+      </select>
+      <div id="v-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Costo/KM mensual</div>
+      <div class="csub">S/ combustible ÷ KM · sin peajes</div>
+      <div id="ch-v-cxk" style="height:220px"></div>
+    </div>
+  </div>
+  <div class="crow c2">
+    <div class="ccard">
+      <div class="ctitle">KM Recorridos por mes</div>
+      <div class="csub"></div>
+      <div id="ch-v-km" style="height:240px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Gasto Combustible por mes</div>
+      <div class="csub">S/ con IGV · sin peajes</div>
+      <div id="ch-v-fuel" style="height:240px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= TIPO TRABAJO ======= -->
+<div id="panel-trabajo" class="panel">
+  <div class="crow c2">
+    <div class="ccard">
+      <div class="ctitle">Evolución Mensual por Tipo de Trabajo</div>
+      <div class="csub">Líneas · filtro aplicado</div>
+      <div class="cleg">
+        <div class="cli"><div class="cdot" style="background:#4af0a8"></div>MERCH</div>
+        <div class="cli"><div class="cdot" style="background:#4a8af0"></div>OPERACIONES</div>
+        <div class="cli"><div class="cdot" style="background:#f0a84a"></div>SUPERVISOR</div>
+      </div>
+      <div id="ch-t-lines" style="height:290px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Mapa de Calor Tipo × Mes</div>
+      <div class="csub">Intensidad = gasto S/</div>
+      <div id="ch-heat" style="height:290px"></div>
+    </div>
+  </div>
+  <div class="crow c12">
+    <div class="ccard">
+      <div class="ctitle">Promedio Mensual por Tipo</div>
+      <div class="csub">S/ promedio / mes</div>
+      <div id="ch-t-avg" style="height:200px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Tabla Detalle por Tipo × Mes</div>
+      <div class="csub">Filtro aplicado</div>
+      <div class="tscroll"><table class="tbl"><thead><tr><th>Tipo</th><th>Mes</th><th>Gasto (S/)</th></tr></thead><tbody id="t-tbody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= CONDUCTORES ======= -->
+<div id="panel-conductores" class="panel">
+  <div class="crow c2">
+    <div class="ccard">
+      <div class="ctitle">GAS vs GASOLINA vs DIESEL por Conductor</div>
+      <div class="csub">% de facturas históricas por tipo de combustible</div>
+      <div id="ch-c-fuel" style="height:420px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Volumen de Facturas por Conductor</div>
+      <div class="csub">Total histórico de cargas registradas</div>
+      <div id="ch-c-count" style="height:420px"></div>
+    </div>
+  </div>
+  <div class="ccard" style="margin-bottom:14px">
+    <div class="ctitle">Detalle de Proporción por Conductor</div>
+    <div class="csub">GNV · Gasolina · Diesel — historial completo</div>
+    <div class="cgrid" id="cond-cards" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ======= PEAJES ======= -->
+<div id="panel-peajes" class="panel">
+  <div class="kgrid kgrid-3" id="kpis-p"></div>
+  <div class="crow c2">
+    <div class="ccard">
+      <div class="ctitle">Peajes Mensuales</div>
+      <div class="csub">S/ con IGV · filtro activo</div>
+      <div id="ch-p-trend" style="height:270px"></div>
+    </div>
+    <div class="ccard">
+      <div class="ctitle">Combustible vs Peajes</div>
+      <div class="csub">Comparativa mensual lado a lado</div>
+      <div id="ch-p-vs" style="height:270px"></div>
+    </div>
+  </div>
+  <div class="ccard">
+    <div class="ctitle">Nota Metodológica</div>
+    <div class="note">
+      ✅ <strong>Costo/KM = Gasto Combustible ÷ KM Recorridos</strong> — los peajes NO están incluidos en este cálculo.<br>
+      ✅ Las tres fuentes (BBDD KM, Liquidación Combustible, Peajes) se relacionan por <strong>PLACA + MES + AÑO</strong>.<br>
+      ✅ Solo se incluyen facturas con glosa "COMBUSTIBLE" en el cálculo de costo de carburante.<br>
+      ✅ GAS = GNV (Gas Natural Vehicular) · DIESEL = Diesel B5 · Rango: 2021–2026
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ======================================================
+// DATA
+// ======================================================
+const RAW = {"records":[{"PLACA":"AHU-802","MES":"SET 21'","AÑO":2021,"KM":272,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"AHU-802","MES":"OCT 21'","AÑO":2021,"KM":1988,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BWT-628","MES":"OCT 21'","AÑO":2021,"KM":369,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BWT-503","MES":"OCT 21'","AÑO":2021,"KM":717,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"AHU-802","MES":"NOV 21'","AÑO":2021,"KM":1809,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BWT-628","MES":"NOV 21'","AÑO":2021,"KM":1542,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BWT-503","MES":"NOV 21'","AÑO":2021,"KM":1272,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"AHU-802","MES":"DIC 21'","AÑO":2021,"KM":1459,"FUEL":250,"PEAJE":0,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BWT-628","MES":"DIC 21'","AÑO":2021,"KM":1814,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BWT-503","MES":"DIC 21'","AÑO":2021,"KM":453,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BWT-628","MES":"ENE 22'","AÑO":2022,"KM":2361,"FUEL":428.88,"PEAJE":0,"CXK":0.18,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"AHU-802","MES":"ENE 22'","AÑO":2022,"KM":123,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BWT-503","MES":"ENE 22'","AÑO":2022,"KM":1015,"FUEL":200,"PEAJE":0,"CXK":0.2,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BBU-946","MES":"ENE 22'","AÑO":2022,"KM":1357.36,"FUEL":716.56,"PEAJE":0,"CXK":0.53,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BCH-843","MES":"ENE 22'","AÑO":2022,"KM":1114.5,"FUEL":350,"PEAJE":0,"CXK":0.31,"CONDUCTOR":"LUIS ÁVILES","TIPO":"MERCH"},{"PLACA":"BBV-701","MES":"ENE 22'","AÑO":2022,"KM":1340.15,"FUEL":480.03,"PEAJE":0,"CXK":0.36,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"FEB 22'","AÑO":2022,"KM":424.42,"FUEL":245.02,"PEAJE":0,"CXK":0.58,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"FEB 22'","AÑO":2022,"KM":388.6,"FUEL":150,"PEAJE":0,"CXK":0.39,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BWT-503","MES":"FEB 22'","AÑO":2022,"KM":656,"FUEL":200,"PEAJE":0,"CXK":0.3,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BNI-776","MES":"FEB 22'","AÑO":2022,"KM":273.36,"FUEL":290,"PEAJE":0,"CXK":1.06,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"AHU-802","MES":"FEB 22'","AÑO":2022,"KM":0,"FUEL":30,"PEAJE":0,"CXK":0,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BWT-628","MES":"FEB 22'","AÑO":2022,"KM":838,"FUEL":580.82,"PEAJE":0,"CXK":0.69,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BBV-701","MES":"FEB 22'","AÑO":2022,"KM":1543.29,"FUEL":679.33,"PEAJE":0,"CXK":0.44,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BCH-843","MES":"FEB 22'","AÑO":2022,"KM":1054.14,"FUEL":650,"PEAJE":0,"CXK":0.62,"CONDUCTOR":"LUIS ÁVILES","TIPO":"MERCH"},{"PLACA":"BBU-946","MES":"FEB 22'","AÑO":2022,"KM":1085.32,"FUEL":580,"PEAJE":0,"CXK":0.53,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BWT-503","MES":"MAR 22'","AÑO":2022,"KM":395.9,"FUEL":430,"PEAJE":0,"CXK":1.09,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BNI-737","MES":"MAR 22'","AÑO":2022,"KM":2246.37,"FUEL":1100,"PEAJE":0,"CXK":0.49,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"MAR 22'","AÑO":2022,"KM":1889.71,"FUEL":866.02,"PEAJE":0,"CXK":0.46,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"MAR 22'","AÑO":2022,"KM":2278.3,"FUEL":1089.01,"PEAJE":0,"CXK":0.48,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BWT-628","MES":"MAR 22'","AÑO":2022,"KM":930,"FUEL":773.26,"PEAJE":0,"CXK":0.83,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BNK-756","MES":"ABR 22'","AÑO":2022,"KM":1504.03,"FUEL":850,"PEAJE":0,"CXK":0.57,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"ABR 22'","AÑO":2022,"KM":1351.44,"FUEL":850,"PEAJE":0,"CXK":0.63,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BJP-788","MES":"ABR 22'","AÑO":2022,"KM":866.32,"FUEL":550,"PEAJE":0,"CXK":0.63,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"ABR 22'","AÑO":2022,"KM":1164.93,"FUEL":600,"PEAJE":0,"CXK":0.52,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BBV-701","MES":"ABR 22'","AÑO":2022,"KM":716.1,"FUEL":450.02,"PEAJE":0,"CXK":0.63,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BBU-946","MES":"ABR 22'","AÑO":2022,"KM":593.77,"FUEL":319.32,"PEAJE":0,"CXK":0.54,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BWT-628","MES":"ABR 22'","AÑO":2022,"KM":1337,"FUEL":632.92,"PEAJE":0,"CXK":0.47,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BWT-503","MES":"ABR 22'","AÑO":2022,"KM":223,"FUEL":381.02,"PEAJE":0,"CXK":1.71,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BJP-788","MES":"MAY 22'","AÑO":2022,"KM":2427.13,"FUEL":1660.02,"PEAJE":0,"CXK":0.68,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BWT-503","MES":"MAY 22'","AÑO":2022,"KM":2271,"FUEL":778.04,"PEAJE":0,"CXK":0.34,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BNK-756","MES":"MAY 22'","AÑO":2022,"KM":1927.03,"FUEL":1049.98,"PEAJE":0,"CXK":0.54,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"MAY 22'","AÑO":2022,"KM":2354.78,"FUEL":1300,"PEAJE":0,"CXK":0.55,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"MAY 22'","AÑO":2022,"KM":1976.08,"FUEL":700,"PEAJE":0,"CXK":0.35,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BBV-701","MES":"MAY 22'","AÑO":2022,"KM":2518.92,"FUEL":1300,"PEAJE":0,"CXK":0.52,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BWT-628","MES":"MAY 22'","AÑO":2022,"KM":2401,"FUEL":734.92,"PEAJE":0,"CXK":0.31,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BBU-946","MES":"MAY 22'","AÑO":2022,"KM":1657.51,"FUEL":1020,"PEAJE":0,"CXK":0.62,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"JUN 22'","AÑO":2022,"KM":1662.27,"FUEL":1249.97,"PEAJE":0,"CXK":0.75,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"JUN 22'","AÑO":2022,"KM":1303.19,"FUEL":840,"PEAJE":0,"CXK":0.64,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BWT-503","MES":"JUN 22'","AÑO":2022,"KM":3224,"FUEL":882.99,"PEAJE":0,"CXK":0.27,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BNI-776","MES":"JUN 22'","AÑO":2022,"KM":1678.75,"FUEL":1300,"PEAJE":0,"CXK":0.77,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"JUN 22'","AÑO":2022,"KM":1918.96,"FUEL":800,"PEAJE":0,"CXK":0.42,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BJP-788","MES":"JUN 22'","AÑO":2022,"KM":748.23,"FUEL":789.91,"PEAJE":0,"CXK":1.06,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BWT-628","MES":"JUN 22'","AÑO":2022,"KM":1594,"FUEL":1055.38,"PEAJE":0,"CXK":0.66,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BNI-737","MES":"JUN 22'","AÑO":2022,"KM":1754.1,"FUEL":700,"PEAJE":0,"CXK":0.4,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"JUN 22'","AÑO":2022,"KM":1610.97,"FUEL":880.6,"PEAJE":0,"CXK":0.55,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BBU-946","MES":"JUN 22'","AÑO":2022,"KM":689.41,"FUEL":360,"PEAJE":0,"CXK":0.52,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BBV-701","MES":"JUN 22'","AÑO":2022,"KM":680.83,"FUEL":200.11,"PEAJE":0,"CXK":0.29,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BWT-628","MES":"JUL 22'","AÑO":2022,"KM":1592,"FUEL":804.36,"PEAJE":0,"CXK":0.51,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BPP-930","MES":"JUL 22'","AÑO":2022,"KM":2105.42,"FUEL":1299.98,"PEAJE":0,"CXK":0.62,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BJP-788","MES":"JUL 22'","AÑO":2022,"KM":1902.66,"FUEL":1369.39,"PEAJE":0,"CXK":0.72,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BWT-503","MES":"JUL 22'","AÑO":2022,"KM":3198,"FUEL":867.06,"PEAJE":0,"CXK":0.27,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BNI-776","MES":"JUL 22'","AÑO":2022,"KM":1938.79,"FUEL":1199.99,"PEAJE":0,"CXK":0.62,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"JUL 22'","AÑO":2022,"KM":1613.45,"FUEL":950,"PEAJE":0,"CXK":0.59,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"JUL 22'","AÑO":2022,"KM":1216.55,"FUEL":1185.03,"PEAJE":0,"CXK":0.97,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"JUL 22'","AÑO":2022,"KM":2319.91,"FUEL":1762.34,"PEAJE":0,"CXK":0.76,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"AGO 22'","AÑO":2022,"KM":2033.23,"FUEL":1137.5,"PEAJE":0,"CXK":0.56,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BWT-628","MES":"AGO 22'","AÑO":2022,"KM":1878,"FUEL":770.72,"PEAJE":0,"CXK":0.41,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BPR-816","MES":"AGO 22'","AÑO":2022,"KM":2590.55,"FUEL":1835.05,"PEAJE":0,"CXK":0.71,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"AGO 22'","AÑO":2022,"KM":1936.79,"FUEL":1308.54,"PEAJE":0,"CXK":0.68,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"AGO 22'","AÑO":2022,"KM":2239.54,"FUEL":1240.03,"PEAJE":0,"CXK":0.55,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"AGO 22'","AÑO":2022,"KM":2190.93,"FUEL":1100,"PEAJE":0,"CXK":0.5,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BWT-503","MES":"AGO 22'","AÑO":2022,"KM":4099,"FUEL":1430,"PEAJE":0,"CXK":0.35,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BJP-788","MES":"AGO 22'","AÑO":2022,"KM":2954.39,"FUEL":1499.6,"PEAJE":0,"CXK":0.51,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"SET 22'","AÑO":2022,"KM":2566.02,"FUEL":1800.88,"PEAJE":0,"CXK":0.7,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"SET 22'","AÑO":2022,"KM":2838.11,"FUEL":1780.6,"PEAJE":0,"CXK":0.63,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"SET 22'","AÑO":2022,"KM":2098.33,"FUEL":844.34,"PEAJE":0,"CXK":0.4,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"SET 22'","AÑO":2022,"KM":1888.1,"FUEL":870,"PEAJE":0,"CXK":0.46,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BWT-628","MES":"SET 22'","AÑO":2022,"KM":1405,"FUEL":761.64,"PEAJE":0,"CXK":0.54,"CONDUCTOR":"EDINSON PEZO","TIPO":"SUPERVISOR"},{"PLACA":"BWT-503","MES":"SET 22'","AÑO":2022,"KM":3495,"FUEL":1210,"PEAJE":0,"CXK":0.35,"CONDUCTOR":"MIGUEL QUIÑONEZ","TIPO":"SUPERVISOR"},{"PLACA":"BJP-788","MES":"SET 22'","AÑO":2022,"KM":1916.24,"FUEL":1000,"PEAJE":0,"CXK":0.52,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"SET 22'","AÑO":2022,"KM":1805.11,"FUEL":949.06,"PEAJE":0,"CXK":0.53,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"OCT 22'","AÑO":2022,"KM":2265.37,"FUEL":1639,"PEAJE":0,"CXK":0.72,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"OCT 22'","AÑO":2022,"KM":1810.41,"FUEL":1551,"PEAJE":0,"CXK":0.86,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"OCT 22'","AÑO":2022,"KM":2620.88,"FUEL":1201.95,"PEAJE":0,"CXK":0.46,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"OCT 22'","AÑO":2022,"KM":1557.9,"FUEL":875.05,"PEAJE":0,"CXK":0.56,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BJP-788","MES":"OCT 22'","AÑO":2022,"KM":1720.85,"FUEL":1158.62,"PEAJE":0,"CXK":0.67,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"OCT 22'","AÑO":2022,"KM":1531.1,"FUEL":1153.23,"PEAJE":0,"CXK":0.75,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"NOV 22'","AÑO":2022,"KM":2188.46,"FUEL":1549,"PEAJE":0,"CXK":0.71,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"NOV 22'","AÑO":2022,"KM":2286.5,"FUEL":1197.99,"PEAJE":0,"CXK":0.52,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"NOV 22'","AÑO":2022,"KM":1481.05,"FUEL":699.09,"PEAJE":0,"CXK":0.47,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BJP-788","MES":"NOV 22'","AÑO":2022,"KM":1763.58,"FUEL":1367.45,"PEAJE":0,"CXK":0.78,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"NOV 22'","AÑO":2022,"KM":1492.21,"FUEL":950,"PEAJE":0,"CXK":0.64,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"NOV 22'","AÑO":2022,"KM":2399.83,"FUEL":1800,"PEAJE":0,"CXK":0.75,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"DIC 22'","AÑO":2022,"KM":2066.82,"FUEL":1075.13,"PEAJE":0,"CXK":0.52,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BJP-788","MES":"DIC 22'","AÑO":2022,"KM":2901.66,"FUEL":1856.69,"PEAJE":0,"CXK":0.64,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"DIC 22'","AÑO":2022,"KM":2899.73,"FUEL":2049.3,"PEAJE":0,"CXK":0.71,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"DIC 22'","AÑO":2022,"KM":2800.13,"FUEL":2150.02,"PEAJE":0,"CXK":0.77,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"DIC 22'","AÑO":2022,"KM":1284.7,"FUEL":1050,"PEAJE":0,"CXK":0.82,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"DIC 22'","AÑO":2022,"KM":2136.51,"FUEL":1442.89,"PEAJE":0,"CXK":0.68,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BJP-788","MES":"ENE 23'","AÑO":2023,"KM":1179.3,"FUEL":760,"PEAJE":0,"CXK":0.64,"CONDUCTOR":"CARLOS MORALES","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"ENE 23'","AÑO":2023,"KM":3276.04,"FUEL":1646.16,"PEAJE":0,"CXK":0.5,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"ENE 23'","AÑO":2023,"KM":787.8,"FUEL":340,"PEAJE":0,"CXK":0.43,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"ENE 23'","AÑO":2023,"KM":701.95,"FUEL":500,"PEAJE":0,"CXK":0.71,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"ENE 23'","AÑO":2023,"KM":3754.43,"FUEL":2075.02,"PEAJE":0,"CXK":0.55,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"ENE 23'","AÑO":2023,"KM":3217.36,"FUEL":1436.02,"PEAJE":0,"CXK":0.45,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"ENE 23'","AÑO":2023,"KM":117.16,"FUEL":100,"PEAJE":0,"CXK":0.85,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"ENE 23'","AÑO":2023,"KM":2190.59,"FUEL":1602.1,"PEAJE":0,"CXK":0.73,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"ENE 23'","AÑO":2023,"KM":1895.48,"FUEL":1518.33,"PEAJE":0,"CXK":0.8,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BBY-796","MES":"ENE 23'","AÑO":2023,"KM":1938.03,"FUEL":1079.94,"PEAJE":0,"CXK":0.56,"CONDUCTOR":"DAVID","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"FEB 23'","AÑO":2023,"KM":1133.84,"FUEL":1638.96,"PEAJE":0,"CXK":1.45,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"FEB 23'","AÑO":2023,"KM":2336.09,"FUEL":1787.36,"PEAJE":0,"CXK":0.77,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BBY-796","MES":"FEB 23'","AÑO":2023,"KM":2720.82,"FUEL":1855.5,"PEAJE":0,"CXK":0.68,"CONDUCTOR":"DAVID","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"FEB 23'","AÑO":2023,"KM":2165.67,"FUEL":1872.3,"PEAJE":0,"CXK":0.86,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"FEB 23'","AÑO":2023,"KM":1114.67,"FUEL":790.53,"PEAJE":0,"CXK":0.71,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"FEB 23'","AÑO":2023,"KM":2466.9,"FUEL":2062.28,"PEAJE":0,"CXK":0.84,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"FEB 23'","AÑO":2023,"KM":1763.39,"FUEL":1344.26,"PEAJE":0,"CXK":0.76,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"FEB 23'","AÑO":2023,"KM":1825.25,"FUEL":595.04,"PEAJE":0,"CXK":0.33,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"FEB 23'","AÑO":2023,"KM":1870.12,"FUEL":1674.07,"PEAJE":0,"CXK":0.9,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"FEB 23'","AÑO":2023,"KM":891.57,"FUEL":676,"PEAJE":0,"CXK":0.76,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BBY-796","MES":"MAR 23'","AÑO":2023,"KM":1778.18,"FUEL":657.06,"PEAJE":0,"CXK":0.37,"CONDUCTOR":"DAVID","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"MAR 23'","AÑO":2023,"KM":2748.27,"FUEL":2027.08,"PEAJE":0,"CXK":0.74,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"MAR 23'","AÑO":2023,"KM":1635.55,"FUEL":1103.13,"PEAJE":0,"CXK":0.67,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"MAR 23'","AÑO":2023,"KM":344.81,"FUEL":145.68,"PEAJE":0,"CXK":0.42,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"MAR 23'","AÑO":2023,"KM":959.9,"FUEL":749.95,"PEAJE":0,"CXK":0.78,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"MAR 23'","AÑO":2023,"KM":1330.84,"FUEL":1268.09,"PEAJE":0,"CXK":0.95,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"MAR 23'","AÑO":2023,"KM":2270.33,"FUEL":574.13,"PEAJE":0,"CXK":0.25,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"MAR 23'","AÑO":2023,"KM":2521.07,"FUEL":1699.38,"PEAJE":0,"CXK":0.67,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"MAR 23'","AÑO":2023,"KM":3288.19,"FUEL":1823.42,"PEAJE":0,"CXK":0.55,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"MAR 23'","AÑO":2023,"KM":3006.95,"FUEL":1990,"PEAJE":0,"CXK":0.66,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"ABR 23'","AÑO":2023,"KM":602.48,"FUEL":380,"PEAJE":0,"CXK":0.63,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"ABR 23'","AÑO":2023,"KM":1671.67,"FUEL":1215.36,"PEAJE":0,"CXK":0.73,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"ABR 23'","AÑO":2023,"KM":1818.22,"FUEL":1187.09,"PEAJE":0,"CXK":0.65,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"ABR 23'","AÑO":2023,"KM":1494.19,"FUEL":636.7,"PEAJE":0,"CXK":0.43,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"ABR 23'","AÑO":2023,"KM":1704.63,"FUEL":1192.52,"PEAJE":0,"CXK":0.7,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"ABR 23'","AÑO":2023,"KM":1790.13,"FUEL":875.18,"PEAJE":0,"CXK":0.49,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"ABR 23'","AÑO":2023,"KM":1678.59,"FUEL":885,"PEAJE":0,"CXK":0.53,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"ABR 23'","AÑO":2023,"KM":3014.88,"FUEL":467.52,"PEAJE":0,"CXK":0.16,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"ABR 23'","AÑO":2023,"KM":1758.67,"FUEL":1104.76,"PEAJE":0,"CXK":0.63,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNI-776","MES":"MAY 23'","AÑO":2023,"KM":743.92,"FUEL":524.19,"PEAJE":0,"CXK":0.7,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"MAY 23'","AÑO":2023,"KM":1405.88,"FUEL":287.94,"PEAJE":0,"CXK":0.2,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"MAY 23'","AÑO":2023,"KM":1380.26,"FUEL":1089.89,"PEAJE":0,"CXK":0.79,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"MAY 23'","AÑO":2023,"KM":3358.11,"FUEL":417.88,"PEAJE":0,"CXK":0.12,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"MAY 23'","AÑO":2023,"KM":1150.76,"FUEL":630.02,"PEAJE":0,"CXK":0.55,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"MAY 23'","AÑO":2023,"KM":1583.31,"FUEL":929.9,"PEAJE":0,"CXK":0.59,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"MAY 23'","AÑO":2023,"KM":2085.67,"FUEL":1355.13,"PEAJE":0,"CXK":0.65,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"MAY 23'","AÑO":2023,"KM":1891.4,"FUEL":1017.51,"PEAJE":0,"CXK":0.54,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"JUN 23'","AÑO":2023,"KM":1566.84,"FUEL":1215.51,"PEAJE":0,"CXK":0.78,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"JUN 23'","AÑO":2023,"KM":2288.73,"FUEL":494,"PEAJE":13,"CXK":0.22,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"JUN 23'","AÑO":2023,"KM":2156.27,"FUEL":1079.53,"PEAJE":65,"CXK":0.5,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNI-776","MES":"JUN 23'","AÑO":2023,"KM":1682.05,"FUEL":728.71,"PEAJE":0,"CXK":0.43,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"JUN 23'","AÑO":2023,"KM":234.26,"FUEL":220,"PEAJE":0,"CXK":0.94,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"JUN 23'","AÑO":2023,"KM":1929.97,"FUEL":1189.06,"PEAJE":0,"CXK":0.62,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"JUN 23'","AÑO":2023,"KM":1519.01,"FUEL":1053.97,"PEAJE":0,"CXK":0.69,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"JUN 23'","AÑO":2023,"KM":1700.05,"FUEL":1100,"PEAJE":0,"CXK":0.65,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"JUN 23'","AÑO":2023,"KM":2345.5,"FUEL":542.98,"PEAJE":0,"CXK":0.23,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"JUL 23'","AÑO":2023,"KM":1738.31,"FUEL":1050,"PEAJE":0,"CXK":0.6,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"JUL 23'","AÑO":2023,"KM":2747.97,"FUEL":742.68,"PEAJE":0,"CXK":0.27,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"JUL 23'","AÑO":2023,"KM":2391.04,"FUEL":378.45,"PEAJE":84.5,"CXK":0.16,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"JUL 23'","AÑO":2023,"KM":2676.36,"FUEL":1608.38,"PEAJE":182,"CXK":0.6,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BPR-828","MES":"JUL 23'","AÑO":2023,"KM":799.53,"FUEL":285.05,"PEAJE":0,"CXK":0.36,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"JUL 23'","AÑO":2023,"KM":1785.3,"FUEL":1233.99,"PEAJE":0,"CXK":0.69,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"JUL 23'","AÑO":2023,"KM":1978.25,"FUEL":739.18,"PEAJE":0,"CXK":0.37,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"JUL 23'","AÑO":2023,"KM":1335.54,"FUEL":748.5,"PEAJE":0,"CXK":0.56,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"JUL 23'","AÑO":2023,"KM":2054.72,"FUEL":1316.54,"PEAJE":0,"CXK":0.64,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"AGO 23'","AÑO":2023,"KM":1219.95,"FUEL":1176.08,"PEAJE":0,"CXK":0.96,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"AGO 23'","AÑO":2023,"KM":1951.03,"FUEL":765.27,"PEAJE":0,"CXK":0.39,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"AGO 23'","AÑO":2023,"KM":1547.75,"FUEL":1023.3,"PEAJE":0,"CXK":0.66,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"AGO 23'","AÑO":2023,"KM":2819.76,"FUEL":468.42,"PEAJE":104,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"AGO 23'","AÑO":2023,"KM":2503.62,"FUEL":1474.55,"PEAJE":195,"CXK":0.59,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"AGO 23'","AÑO":2023,"KM":645.91,"FUEL":580,"PEAJE":0,"CXK":0.9,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"AGO 23'","AÑO":2023,"KM":2057.72,"FUEL":1354.77,"PEAJE":0,"CXK":0.66,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"AGO 23'","AÑO":2023,"KM":1573.22,"FUEL":895.7,"PEAJE":0,"CXK":0.57,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"AGO 23'","AÑO":2023,"KM":2182.58,"FUEL":1250,"PEAJE":0,"CXK":0.57,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"SET 23'","AÑO":2023,"KM":2323.65,"FUEL":1530,"PEAJE":0,"CXK":0.66,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"SET 23'","AÑO":2023,"KM":2669.21,"FUEL":403.61,"PEAJE":91,"CXK":0.15,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"SET 23'","AÑO":2023,"KM":1011.68,"FUEL":797.66,"PEAJE":0,"CXK":0.79,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"SET 23'","AÑO":2023,"KM":1898.75,"FUEL":828.68,"PEAJE":0,"CXK":0.44,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"SET 23'","AÑO":2023,"KM":2428.6,"FUEL":1360.54,"PEAJE":0,"CXK":0.56,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"SET 23'","AÑO":2023,"KM":2425.41,"FUEL":1251.73,"PEAJE":0,"CXK":0.52,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"SET 23'","AÑO":2023,"KM":2572.06,"FUEL":1547.19,"PEAJE":182,"CXK":0.6,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"SET 23'","AÑO":2023,"KM":1791.1,"FUEL":1148,"PEAJE":0,"CXK":0.64,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"SET 23'","AÑO":2023,"KM":886.97,"FUEL":129.85,"PEAJE":6.5,"CXK":0.15,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"OCT 23'","AÑO":2023,"KM":3265.77,"FUEL":2109.08,"PEAJE":195,"CXK":0.65,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNI-776","MES":"OCT 23'","AÑO":2023,"KM":1971.78,"FUEL":1073.84,"PEAJE":0,"CXK":0.54,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"OCT 23'","AÑO":2023,"KM":1649.72,"FUEL":1550,"PEAJE":0,"CXK":0.94,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"OCT 23'","AÑO":2023,"KM":1323.28,"FUEL":869.88,"PEAJE":0,"CXK":0.66,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"OCT 23'","AÑO":2023,"KM":1911.61,"FUEL":1536.41,"PEAJE":0,"CXK":0.8,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"OCT 23'","AÑO":2023,"KM":3398.7,"FUEL":1690,"PEAJE":0,"CXK":0.5,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"OCT 23'","AÑO":2023,"KM":3322.42,"FUEL":571.32,"PEAJE":52,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"OCT 23'","AÑO":2023,"KM":1815.76,"FUEL":1348.04,"PEAJE":0,"CXK":0.74,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"NOV 23'","AÑO":2023,"KM":1206.54,"FUEL":819.35,"PEAJE":0,"CXK":0.68,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"NOV 23'","AÑO":2023,"KM":1408.07,"FUEL":820.14,"PEAJE":0,"CXK":0.58,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"NOV 23'","AÑO":2023,"KM":1472.84,"FUEL":840,"PEAJE":0,"CXK":0.57,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"NOV 23'","AÑO":2023,"KM":2097.39,"FUEL":1006.86,"PEAJE":0,"CXK":0.48,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"NOV 23'","AÑO":2023,"KM":2117.34,"FUEL":1170.09,"PEAJE":0,"CXK":0.55,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"NOV 23'","AÑO":2023,"KM":2084.58,"FUEL":409.7,"PEAJE":97.5,"CXK":0.2,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"NOV 23'","AÑO":2023,"KM":1387.24,"FUEL":676.89,"PEAJE":45.5,"CXK":0.49,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"NOV 23'","AÑO":2023,"KM":2576.03,"FUEL":1604.27,"PEAJE":223,"CXK":0.62,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"NOV 23'","AÑO":2023,"KM":1961.94,"FUEL":1498,"PEAJE":0,"CXK":0.76,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"DIC 23'","AÑO":2023,"KM":2079.66,"FUEL":782.19,"PEAJE":58.5,"CXK":0.38,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"DIC 23'","AÑO":2023,"KM":3235.24,"FUEL":1627.99,"PEAJE":0,"CXK":0.5,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"DIC 23'","AÑO":2023,"KM":2925.56,"FUEL":1861.85,"PEAJE":214.5,"CXK":0.64,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"DIC 23'","AÑO":2023,"KM":1657.43,"FUEL":362.83,"PEAJE":45.5,"CXK":0.22,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"DIC 23'","AÑO":2023,"KM":2315.78,"FUEL":1446.76,"PEAJE":0,"CXK":0.62,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"DIC 23'","AÑO":2023,"KM":2118.41,"FUEL":922.03,"PEAJE":0,"CXK":0.44,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"DIC 23'","AÑO":2023,"KM":1313.89,"FUEL":1350,"PEAJE":0,"CXK":1.03,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"DIC 23'","AÑO":2023,"KM":1424.66,"FUEL":1330,"PEAJE":0,"CXK":0.93,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"DIC 23'","AÑO":2023,"KM":1122.28,"FUEL":511.85,"PEAJE":0,"CXK":0.46,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"ENE 24'","AÑO":2024,"KM":1816.38,"FUEL":1051.68,"PEAJE":39,"CXK":0.58,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"ENE 24'","AÑO":2024,"KM":3251.55,"FUEL":2012.47,"PEAJE":131,"CXK":0.62,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"ENE 24'","AÑO":2024,"KM":3531.77,"FUEL":2120.07,"PEAJE":140.5,"CXK":0.6,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"ENE 24'","AÑO":2024,"KM":2972.33,"FUEL":492.96,"PEAJE":71.5,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"ENE 24'","AÑO":2024,"KM":2412.6,"FUEL":1647.33,"PEAJE":177.5,"CXK":0.68,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"ENE 24'","AÑO":2024,"KM":1988.05,"FUEL":1450,"PEAJE":19.5,"CXK":0.73,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"ENE 24'","AÑO":2024,"KM":3368.91,"FUEL":1510.79,"PEAJE":149.5,"CXK":0.45,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"ENE 24'","AÑO":2024,"KM":3029.05,"FUEL":1410,"PEAJE":52,"CXK":0.47,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"ENE 24'","AÑO":2024,"KM":2132.72,"FUEL":279.91,"PEAJE":91,"CXK":0.13,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"FEB 24'","AÑO":2024,"KM":2063.85,"FUEL":1300,"PEAJE":22.5,"CXK":0.63,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"FEB 24'","AÑO":2024,"KM":1381.99,"FUEL":824.95,"PEAJE":45,"CXK":0.6,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"FEB 24'","AÑO":2024,"KM":2245.37,"FUEL":1681.51,"PEAJE":247.5,"CXK":0.75,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BPR-828","MES":"FEB 24'","AÑO":2024,"KM":1237.15,"FUEL":569,"PEAJE":82.5,"CXK":0.46,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"FEB 24'","AÑO":2024,"KM":2278.94,"FUEL":835.37,"PEAJE":90,"CXK":0.37,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"FEB 24'","AÑO":2024,"KM":4482.6,"FUEL":2130,"PEAJE":225,"CXK":0.48,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"FEB 24'","AÑO":2024,"KM":1749.22,"FUEL":623.43,"PEAJE":82.5,"CXK":0.36,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BNI-776","MES":"FEB 24'","AÑO":2024,"KM":1958.13,"FUEL":1137.67,"PEAJE":15,"CXK":0.58,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BNK-756","MES":"FEB 24'","AÑO":2024,"KM":362.54,"FUEL":130,"PEAJE":15,"CXK":0.36,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"MAR 24'","AÑO":2024,"KM":1009.79,"FUEL":550,"PEAJE":37.5,"CXK":0.54,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"MAR 24'","AÑO":2024,"KM":1826.63,"FUEL":650.4,"PEAJE":82.5,"CXK":0.36,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"MAR 24'","AÑO":2024,"KM":4151.41,"FUEL":2120,"PEAJE":135,"CXK":0.51,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"MAR 24'","AÑO":2024,"KM":1638.51,"FUEL":947.55,"PEAJE":45,"CXK":0.58,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"MAR 24'","AÑO":2024,"KM":1753,"FUEL":1391.26,"PEAJE":97.5,"CXK":0.79,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"MAR 24'","AÑO":2024,"KM":1806.07,"FUEL":1228.33,"PEAJE":97.5,"CXK":0.68,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"MAR 24'","AÑO":2024,"KM":1814.1,"FUEL":1194.36,"PEAJE":157.5,"CXK":0.66,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"MAR 24'","AÑO":2024,"KM":1483.74,"FUEL":816.77,"PEAJE":52.5,"CXK":0.55,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"MAR 24'","AÑO":2024,"KM":1492.04,"FUEL":1083.01,"PEAJE":15,"CXK":0.73,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"ABR 24'","AÑO":2024,"KM":2909.39,"FUEL":1316.02,"PEAJE":195,"CXK":0.45,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"ABR 24'","AÑO":2024,"KM":2606.1,"FUEL":1742.13,"PEAJE":300,"CXK":0.67,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BPR-816","MES":"ABR 24'","AÑO":2024,"KM":1577.52,"FUEL":1080,"PEAJE":15,"CXK":0.68,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"ABR 24'","AÑO":2024,"KM":1901.73,"FUEL":618.95,"PEAJE":37.5,"CXK":0.33,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"ABR 24'","AÑO":2024,"KM":1521.69,"FUEL":1097.38,"PEAJE":0,"CXK":0.72,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"ABR 24'","AÑO":2024,"KM":2309.69,"FUEL":1127.77,"PEAJE":52.5,"CXK":0.49,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"ABR 24'","AÑO":2024,"KM":21.04,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"ABR 24'","AÑO":2024,"KM":21,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BNI-737","MES":"ABR 24'","AÑO":2024,"KM":2454.29,"FUEL":1750,"PEAJE":60,"CXK":0.71,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"ABR 24'","AÑO":2024,"KM":21.02,"FUEL":0,"PEAJE":0,"CXK":0,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"ABR 24'","AÑO":2024,"KM":1967.08,"FUEL":476.18,"PEAJE":120,"CXK":0.24,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BNK-756","MES":"ABR 24'","AÑO":2024,"KM":1688.18,"FUEL":1031.9,"PEAJE":75,"CXK":0.61,"CONDUCTOR":"ORLANDO GARCÍA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"MAY 24'","AÑO":2024,"KM":1960.04,"FUEL":1150.43,"PEAJE":45,"CXK":0.59,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"MAY 24'","AÑO":2024,"KM":2252.57,"FUEL":1290,"PEAJE":30,"CXK":0.57,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BNI-776","MES":"MAY 24'","AÑO":2024,"KM":482.47,"FUEL":160,"PEAJE":30,"CXK":0.33,"CONDUCTOR":"MARCO RAMIREZ","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"MAY 24'","AÑO":2024,"KM":2348.63,"FUEL":900,"PEAJE":0,"CXK":0.38,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"MAY 24'","AÑO":2024,"KM":1245.53,"FUEL":796.16,"PEAJE":15,"CXK":0.64,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"MAY 24'","AÑO":2024,"KM":1275.96,"FUEL":630,"PEAJE":0,"CXK":0.49,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"MAY 24'","AÑO":2024,"KM":1567.53,"FUEL":1004.07,"PEAJE":0,"CXK":0.64,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"MAY 24'","AÑO":2024,"KM":1782.55,"FUEL":604.83,"PEAJE":82.5,"CXK":0.34,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"MAY 24'","AÑO":2024,"KM":2279.24,"FUEL":1215.49,"PEAJE":225,"CXK":0.53,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"MAY 24'","AÑO":2024,"KM":1722.16,"FUEL":379.79,"PEAJE":60,"CXK":0.22,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPR-828","MES":"JUN 24'","AÑO":2024,"KM":1510.95,"FUEL":640.17,"PEAJE":105,"CXK":0.42,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"JUN 24'","AÑO":2024,"KM":2300.31,"FUEL":1065.54,"PEAJE":127.5,"CXK":0.46,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"JUN 24'","AÑO":2024,"KM":1686.84,"FUEL":900.06,"PEAJE":7.5,"CXK":0.53,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"JUN 24'","AÑO":2024,"KM":762.17,"FUEL":279.31,"PEAJE":45,"CXK":0.37,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"JUN 24'","AÑO":2024,"KM":1715.65,"FUEL":943.47,"PEAJE":14.1,"CXK":0.55,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"JUN 24'","AÑO":2024,"KM":1470.41,"FUEL":811.44,"PEAJE":142.5,"CXK":0.55,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"JUN 24'","AÑO":2024,"KM":1787.85,"FUEL":302.9,"PEAJE":50.7,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"JUN 24'","AÑO":2024,"KM":2235.79,"FUEL":801.65,"PEAJE":6.6,"CXK":0.36,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"JUN 24'","AÑO":2024,"KM":1403.74,"FUEL":497.21,"PEAJE":7.5,"CXK":0.35,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"JUL 24'","AÑO":2024,"KM":3080.3,"FUEL":783.75,"PEAJE":270.6,"CXK":0.25,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"JUL 24'","AÑO":2024,"KM":1599.2,"FUEL":1000.37,"PEAJE":150,"CXK":0.63,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"JUL 24'","AÑO":2024,"KM":2806.29,"FUEL":947.15,"PEAJE":213.6,"CXK":0.34,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"JUL 24'","AÑO":2024,"KM":2669.35,"FUEL":456.86,"PEAJE":194.7,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"JUL 24'","AÑO":2024,"KM":1511.95,"FUEL":456.3,"PEAJE":116.4,"CXK":0.3,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"JUL 24'","AÑO":2024,"KM":775.21,"FUEL":193.28,"PEAJE":21.6,"CXK":0.25,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"JUL 24'","AÑO":2024,"KM":1793.29,"FUEL":1002.09,"PEAJE":7.5,"CXK":0.56,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"JUL 24'","AÑO":2024,"KM":1850.68,"FUEL":1070,"PEAJE":90,"CXK":0.58,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"JUL 24'","AÑO":2024,"KM":1534.74,"FUEL":831.74,"PEAJE":58.2,"CXK":0.54,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"AGO 24'","AÑO":2024,"KM":624.61,"FUEL":79.84,"PEAJE":37.5,"CXK":0.13,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"AGO 24'","AÑO":2024,"KM":1997.1,"FUEL":550.21,"PEAJE":194.7,"CXK":0.28,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"AGO 24'","AÑO":2024,"KM":2857.03,"FUEL":694.43,"PEAJE":299.7,"CXK":0.24,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"AGO 24'","AÑO":2024,"KM":1903.34,"FUEL":998.18,"PEAJE":117.6,"CXK":0.52,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"AGO 24'","AÑO":2024,"KM":1825.59,"FUEL":472.52,"PEAJE":123,"CXK":0.26,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"AGO 24'","AÑO":2024,"KM":1102.31,"FUEL":578.37,"PEAJE":95.7,"CXK":0.52,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"AGO 24'","AÑO":2024,"KM":1865.28,"FUEL":1050,"PEAJE":37.5,"CXK":0.56,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"AGO 24'","AÑO":2024,"KM":930.49,"FUEL":402.44,"PEAJE":49.8,"CXK":0.43,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"AGO 24'","AÑO":2024,"KM":1446.11,"FUEL":325.16,"PEAJE":124.2,"CXK":0.22,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"SET 24'","AÑO":2024,"KM":2361.17,"FUEL":523.17,"PEAJE":246.6,"CXK":0.22,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"SET 24'","AÑO":2024,"KM":1177.92,"FUEL":650,"PEAJE":48,"CXK":0.55,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"SET 24'","AÑO":2024,"KM":1474.44,"FUEL":375.25,"PEAJE":85.5,"CXK":0.25,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"SET 24'","AÑO":2024,"KM":2001.74,"FUEL":659.43,"PEAJE":157.2,"CXK":0.33,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"SET 24'","AÑO":2024,"KM":2298.92,"FUEL":637.97,"PEAJE":239.1,"CXK":0.28,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"SET 24'","AÑO":2024,"KM":3443.46,"FUEL":892.88,"PEAJE":291.3,"CXK":0.26,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"SET 24'","AÑO":2024,"KM":2505.6,"FUEL":1461.99,"PEAJE":282.3,"CXK":0.58,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BPR-828","MES":"SET 24'","AÑO":2024,"KM":1675.12,"FUEL":760.24,"PEAJE":98.7,"CXK":0.45,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"SET 24'","AÑO":2024,"KM":1990.06,"FUEL":1230,"PEAJE":175.2,"CXK":0.62,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"OCT 24'","AÑO":2024,"KM":2214.75,"FUEL":1119.18,"PEAJE":217.5,"CXK":0.51,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"OCT 24'","AÑO":2024,"KM":1699.85,"FUEL":492.34,"PEAJE":165.6,"CXK":0.29,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"OCT 24'","AÑO":2024,"KM":1863.72,"FUEL":797.93,"PEAJE":215.4,"CXK":0.43,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"OCT 24'","AÑO":2024,"KM":2408.67,"FUEL":619.61,"PEAJE":254.1,"CXK":0.26,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPR-828","MES":"OCT 24'","AÑO":2024,"KM":1996.33,"FUEL":809.46,"PEAJE":111,"CXK":0.41,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"OCT 24'","AÑO":2024,"KM":1610.36,"FUEL":976.9,"PEAJE":59.4,"CXK":0.61,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"OCT 24'","AÑO":2024,"KM":2282.55,"FUEL":482.97,"PEAJE":136.2,"CXK":0.21,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"OCT 24'","AÑO":2024,"KM":2448.41,"FUEL":745.99,"PEAJE":91.2,"CXK":0.3,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"OCT 24'","AÑO":2024,"KM":2282.28,"FUEL":482.8,"PEAJE":178.2,"CXK":0.21,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"NOV 24'","AÑO":2024,"KM":2272.6,"FUEL":654.12,"PEAJE":120.3,"CXK":0.29,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"NOV 24'","AÑO":2024,"KM":586.77,"FUEL":535.08,"PEAJE":26.4,"CXK":0.91,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"NOV 24'","AÑO":2024,"KM":1583.24,"FUEL":466.31,"PEAJE":118.5,"CXK":0.29,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPR-828","MES":"NOV 24'","AÑO":2024,"KM":1219.27,"FUEL":837.6,"PEAJE":41.4,"CXK":0.69,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"NOV 24'","AÑO":2024,"KM":1874.64,"FUEL":883.8,"PEAJE":52.8,"CXK":0.47,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"NOV 24'","AÑO":2024,"KM":2255.91,"FUEL":687.96,"PEAJE":253.2,"CXK":0.3,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"NOV 24'","AÑO":2024,"KM":2102.42,"FUEL":603.14,"PEAJE":126.9,"CXK":0.29,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"NOV 24'","AÑO":2024,"KM":2651.94,"FUEL":1456.06,"PEAJE":275.7,"CXK":0.55,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"NOV 24'","AÑO":2024,"KM":2401.03,"FUEL":836.74,"PEAJE":183.6,"CXK":0.35,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"DIC 24'","AÑO":2024,"KM":2235.32,"FUEL":960,"PEAJE":202.2,"CXK":0.43,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"DIC 24'","AÑO":2024,"KM":1971.94,"FUEL":478.89,"PEAJE":138,"CXK":0.24,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"DIC 24'","AÑO":2024,"KM":2627.91,"FUEL":887.98,"PEAJE":216.6,"CXK":0.34,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"DIC 24'","AÑO":2024,"KM":1935.14,"FUEL":999.99,"PEAJE":114.6,"CXK":0.52,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"DIC 24'","AÑO":2024,"KM":2067.59,"FUEL":1240.04,"PEAJE":271.2,"CXK":0.6,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"DIC 24'","AÑO":2024,"KM":2088.99,"FUEL":746.97,"PEAJE":203.1,"CXK":0.36,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"DIC 24'","AÑO":2024,"KM":2215.29,"FUEL":588.18,"PEAJE":225.6,"CXK":0.27,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYW-716","MES":"DIC 24'","AÑO":2024,"KM":2004.28,"FUEL":602.07,"PEAJE":109.2,"CXK":0.3,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"ENE 25'","AÑO":2025,"KM":1942.8,"FUEL":446.66,"PEAJE":131.4,"CXK":0.23,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"ENE 25'","AÑO":2025,"KM":3776.81,"FUEL":1513.62,"PEAJE":230.7,"CXK":0.4,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"ENE 25'","AÑO":2025,"KM":2972.9,"FUEL":1553.57,"PEAJE":292.8,"CXK":0.52,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"ENE 25'","AÑO":2025,"KM":2291.87,"FUEL":926.24,"PEAJE":209.4,"CXK":0.4,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPR-828","MES":"ENE 25'","AÑO":2025,"KM":4004.08,"FUEL":1421.89,"PEAJE":523.5,"CXK":0.36,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"ENE 25'","AÑO":2025,"KM":2389.23,"FUEL":1210,"PEAJE":134.7,"CXK":0.51,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"ENE 25'","AÑO":2025,"KM":1227.88,"FUEL":571.79,"PEAJE":0,"CXK":0.47,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BYW-716","MES":"ENE 25'","AÑO":2025,"KM":2924.71,"FUEL":1007.31,"PEAJE":159.6,"CXK":0.34,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"ENE 25'","AÑO":2025,"KM":1886.97,"FUEL":715.86,"PEAJE":210,"CXK":0.38,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"FEB 25'","AÑO":2025,"KM":2893.27,"FUEL":933.92,"PEAJE":252,"CXK":0.32,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"FEB 25'","AÑO":2025,"KM":2744.83,"FUEL":1051.86,"PEAJE":174.9,"CXK":0.38,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"FEB 25'","AÑO":2025,"KM":2239.58,"FUEL":735.61,"PEAJE":242.7,"CXK":0.33,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"FEB 25'","AÑO":2025,"KM":2022.51,"FUEL":1220.61,"PEAJE":172.5,"CXK":0.6,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CBZ-888","MES":"FEB 25'","AÑO":2025,"KM":2349.71,"FUEL":1247.48,"PEAJE":112.5,"CXK":0.53,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"FEB 25'","AÑO":2025,"KM":3597.67,"FUEL":1400,"PEAJE":288.3,"CXK":0.39,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"FEB 25'","AÑO":2025,"KM":1499.66,"FUEL":813.34,"PEAJE":41.4,"CXK":0.54,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"FEB 25'","AÑO":2025,"KM":2648.46,"FUEL":889.86,"PEAJE":146.4,"CXK":0.34,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"FEB 25'","AÑO":2025,"KM":2277.36,"FUEL":1126,"PEAJE":174.6,"CXK":0.49,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"MAR 25'","AÑO":2025,"KM":2359.08,"FUEL":472.13,"PEAJE":187.5,"CXK":0.2,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"MAR 25'","AÑO":2025,"KM":2053.12,"FUEL":613.44,"PEAJE":178.8,"CXK":0.3,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"MAR 25'","AÑO":2025,"KM":1997.68,"FUEL":733.01,"PEAJE":211.8,"CXK":0.37,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"MAR 25'","AÑO":2025,"KM":1394.75,"FUEL":460.96,"PEAJE":67.5,"CXK":0.33,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"MAR 25'","AÑO":2025,"KM":2539.37,"FUEL":1349.39,"PEAJE":148.5,"CXK":0.53,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"MAR 25'","AÑO":2025,"KM":3064.12,"FUEL":1495.37,"PEAJE":226.8,"CXK":0.49,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"MAR 25'","AÑO":2025,"KM":2107.37,"FUEL":778.18,"PEAJE":229.8,"CXK":0.37,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"MAR 25'","AÑO":2025,"KM":3719.2,"FUEL":1160.81,"PEAJE":189.9,"CXK":0.31,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"MAR 25'","AÑO":2025,"KM":2454.54,"FUEL":1412.85,"PEAJE":327.6,"CXK":0.58,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"MAR 25'","AÑO":2025,"KM":2721.28,"FUEL":720.86,"PEAJE":216,"CXK":0.26,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"ABR 25'","AÑO":2025,"KM":2014.19,"FUEL":1003.69,"PEAJE":216.6,"CXK":0.5,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"ABR 25'","AÑO":2025,"KM":2087.83,"FUEL":574.8,"PEAJE":252.3,"CXK":0.28,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CBZ-888","MES":"ABR 25'","AÑO":2025,"KM":2096.59,"FUEL":601.03,"PEAJE":112.5,"CXK":0.29,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BYW-716","MES":"ABR 25'","AÑO":2025,"KM":1993.92,"FUEL":834.3,"PEAJE":87.6,"CXK":0.42,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"ABR 25'","AÑO":2025,"KM":1726.79,"FUEL":808.65,"PEAJE":119.4,"CXK":0.47,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"ABR 25'","AÑO":2025,"KM":2091.35,"FUEL":866.41,"PEAJE":214.8,"CXK":0.41,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"ABR 25'","AÑO":2025,"KM":2131.97,"FUEL":751.77,"PEAJE":212.1,"CXK":0.35,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"ABR 25'","AÑO":2025,"KM":2244.47,"FUEL":622.36,"PEAJE":162.6,"CXK":0.28,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"ABR 25'","AÑO":2025,"KM":1961.42,"FUEL":1130.01,"PEAJE":131.7,"CXK":0.58,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"ABR 25'","AÑO":2025,"KM":1002.94,"FUEL":563.43,"PEAJE":61.2,"CXK":0.56,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"MAY 25'","AÑO":2025,"KM":2348.24,"FUEL":488.75,"PEAJE":26.4,"CXK":0.21,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"MAY 25'","AÑO":2025,"KM":2038.55,"FUEL":450.87,"PEAJE":120,"CXK":0.22,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"MAY 25'","AÑO":2025,"KM":2390.71,"FUEL":1301.04,"PEAJE":243.9,"CXK":0.54,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"MAY 25'","AÑO":2025,"KM":2288.72,"FUEL":383.21,"PEAJE":265.8,"CXK":0.17,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"MAY 25'","AÑO":2025,"KM":2567.08,"FUEL":404.38,"PEAJE":282.6,"CXK":0.16,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"MAY 25'","AÑO":2025,"KM":2338.27,"FUEL":396.71,"PEAJE":220.8,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BPR-816","MES":"MAY 25'","AÑO":2025,"KM":1542.16,"FUEL":770,"PEAJE":158.4,"CXK":0.5,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"MAY 25'","AÑO":2025,"KM":1958.99,"FUEL":868.46,"PEAJE":87.6,"CXK":0.44,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"MAY 25'","AÑO":2025,"KM":1935.65,"FUEL":1085,"PEAJE":93,"CXK":0.56,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"MAY 25'","AÑO":2025,"KM":1865.42,"FUEL":281.78,"PEAJE":122.4,"CXK":0.15,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"JUN 25'","AÑO":2025,"KM":1876.15,"FUEL":927.7,"PEAJE":162,"CXK":0.49,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"JUN 25'","AÑO":2025,"KM":2113.77,"FUEL":825.03,"PEAJE":127.4,"CXK":0.39,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"JUN 25'","AÑO":2025,"KM":1412.21,"FUEL":276.98,"PEAJE":79.2,"CXK":0.2,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"JUN 25'","AÑO":2025,"KM":2492.39,"FUEL":432.4,"PEAJE":204.6,"CXK":0.17,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BYW-716","MES":"JUN 25'","AÑO":2025,"KM":2594.63,"FUEL":568.29,"PEAJE":144.5,"CXK":0.22,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"JUN 25'","AÑO":2025,"KM":1586.23,"FUEL":335.8,"PEAJE":189.3,"CXK":0.21,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"JUN 25'","AÑO":2025,"KM":2291.14,"FUEL":412.75,"PEAJE":228.6,"CXK":0.18,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"JUN 25'","AÑO":2025,"KM":3859.54,"FUEL":505.58,"PEAJE":385.1,"CXK":0.13,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"JUN 25'","AÑO":2025,"KM":2313.19,"FUEL":850,"PEAJE":242.2,"CXK":0.37,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"JUN 25'","AÑO":2025,"KM":2218.18,"FUEL":1089.17,"PEAJE":208.2,"CXK":0.49,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"JUL 25'","AÑO":2025,"KM":1692.77,"FUEL":951.37,"PEAJE":193.2,"CXK":0.56,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"JUL 25'","AÑO":2025,"KM":3454.94,"FUEL":297.66,"PEAJE":335.2,"CXK":0.09,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"JUL 25'","AÑO":2025,"KM":2028.38,"FUEL":362.69,"PEAJE":189,"CXK":0.18,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"JUL 25'","AÑO":2025,"KM":2280.36,"FUEL":379.87,"PEAJE":205,"CXK":0.17,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"JUL 25'","AÑO":2025,"KM":1860.62,"FUEL":406.07,"PEAJE":83.7,"CXK":0.22,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"JUL 25'","AÑO":2025,"KM":2407.11,"FUEL":505.3,"PEAJE":298.5,"CXK":0.21,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BPR-816","MES":"JUL 25'","AÑO":2025,"KM":2188.5,"FUEL":908,"PEAJE":267.2,"CXK":0.41,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"JUL 25'","AÑO":2025,"KM":1242.2,"FUEL":196.4,"PEAJE":100.4,"CXK":0.16,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"JUL 25'","AÑO":2025,"KM":1868.48,"FUEL":825.4,"PEAJE":181.8,"CXK":0.44,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"JUL 25'","AÑO":2025,"KM":2011.87,"FUEL":910,"PEAJE":142.4,"CXK":0.45,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"AGO 25'","AÑO":2025,"KM":1473.64,"FUEL":288.47,"PEAJE":134.8,"CXK":0.2,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"AGO 25'","AÑO":2025,"KM":2335.6,"FUEL":821.19,"PEAJE":355.2,"CXK":0.35,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"AGO 25'","AÑO":2025,"KM":2231.28,"FUEL":793.94,"PEAJE":250.2,"CXK":0.36,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"AGO 25'","AÑO":2025,"KM":2363.92,"FUEL":409.75,"PEAJE":150.6,"CXK":0.17,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"AGO 25'","AÑO":2025,"KM":2115.23,"FUEL":378.13,"PEAJE":182.4,"CXK":0.18,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"AGO 25'","AÑO":2025,"KM":2320.89,"FUEL":326.08,"PEAJE":281.4,"CXK":0.14,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"AGO 25'","AÑO":2025,"KM":3586.9,"FUEL":564.57,"PEAJE":335.2,"CXK":0.16,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"AGO 25'","AÑO":2025,"KM":2171.14,"FUEL":369.19,"PEAJE":251.23,"CXK":0.17,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"AGO 25'","AÑO":2025,"KM":1382.37,"FUEL":725.77,"PEAJE":149.1,"CXK":0.52,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BPP-930","MES":"AGO 25'","AÑO":2025,"KM":2768.75,"FUEL":930,"PEAJE":225,"CXK":0.34,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"SET 25'","AÑO":2025,"KM":2442.45,"FUEL":1303.27,"PEAJE":307.8,"CXK":0.53,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BTV-704","MES":"SET 25'","AÑO":2025,"KM":1775.32,"FUEL":489.36,"PEAJE":54.4,"CXK":0.28,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"SET 25'","AÑO":2025,"KM":2839.42,"FUEL":744.59,"PEAJE":228.6,"CXK":0.26,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"SET 25'","AÑO":2025,"KM":2905.27,"FUEL":710.62,"PEAJE":209.1,"CXK":0.24,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CFO-709","MES":"SET 25'","AÑO":2025,"KM":1584.29,"FUEL":933.2,"PEAJE":206.1,"CXK":0.59,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"SET 25'","AÑO":2025,"KM":1502.32,"FUEL":385.32,"PEAJE":99,"CXK":0.26,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"SET 25'","AÑO":2025,"KM":873.27,"FUEL":96.81,"PEAJE":33,"CXK":0.11,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CFM-760","MES":"SET 25'","AÑO":2025,"KM":1832.19,"FUEL":821.23,"PEAJE":123,"CXK":0.45,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-828","MES":"SET 25'","AÑO":2025,"KM":384.68,"FUEL":273.52,"PEAJE":46.2,"CXK":0.71,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BPP-930","MES":"SET 25'","AÑO":2025,"KM":322.82,"FUEL":210,"PEAJE":15,"CXK":0.65,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BPR-816","MES":"SET 25'","AÑO":2025,"KM":376.66,"FUEL":120,"PEAJE":52.8,"CXK":0.32,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"SET 25'","AÑO":2025,"KM":1705,"FUEL":393.13,"PEAJE":152.2,"CXK":0.23,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"CFM-856","MES":"SET 25'","AÑO":2025,"KM":1883.02,"FUEL":576.36,"PEAJE":84.6,"CXK":0.31,"CONDUCTOR":"EURORENTING","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"OCT 25'","AÑO":2025,"KM":259.5,"FUEL":216.97,"PEAJE":19.8,"CXK":0.84,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"CFM-856","MES":"OCT 25'","AÑO":2025,"KM":2863.07,"FUEL":829.25,"PEAJE":283.2,"CXK":0.29,"CONDUCTOR":"EURORENTING","TIPO":"OPERACIONES"},{"PLACA":"BYW-716","MES":"OCT 25'","AÑO":2025,"KM":2121.96,"FUEL":543.17,"PEAJE":99,"CXK":0.26,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CFO-709","MES":"OCT 25'","AÑO":2025,"KM":3470.45,"FUEL":770.9,"PEAJE":328.8,"CXK":0.22,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"OCT 25'","AÑO":2025,"KM":1654.38,"FUEL":110.53,"PEAJE":69.4,"CXK":0.07,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CFM-760","MES":"OCT 25'","AÑO":2025,"KM":2355.18,"FUEL":738.01,"PEAJE":210.6,"CXK":0.31,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"OCT 25'","AÑO":2025,"KM":2660.88,"FUEL":482.39,"PEAJE":204.4,"CXK":0.18,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"OCT 25'","AÑO":2025,"KM":2384.86,"FUEL":503.4,"PEAJE":312,"CXK":0.21,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"OCT 25'","AÑO":2025,"KM":1938.97,"FUEL":347.43,"PEAJE":191.1,"CXK":0.18,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"OCT 25'","AÑO":2025,"KM":3509.83,"FUEL":1585,"PEAJE":323.7,"CXK":0.45,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-700","MES":"NOV 25'","AÑO":2025,"KM":2365.86,"FUEL":586.47,"PEAJE":180.9,"CXK":0.25,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CFO-709","MES":"NOV 25'","AÑO":2025,"KM":2360.74,"FUEL":215.9,"PEAJE":127.2,"CXK":0.09,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"NOV 25'","AÑO":2025,"KM":2314.83,"FUEL":514.08,"PEAJE":166.8,"CXK":0.22,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"CFM-760","MES":"NOV 25'","AÑO":2025,"KM":3099.98,"FUEL":530.71,"PEAJE":138.1,"CXK":0.17,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"NOV 25'","AÑO":2025,"KM":2932.44,"FUEL":416.71,"PEAJE":176.5,"CXK":0.14,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"NOV 25'","AÑO":2025,"KM":2353.54,"FUEL":452.79,"PEAJE":178.3,"CXK":0.19,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CFM-856","MES":"NOV 25'","AÑO":2025,"KM":2447.14,"FUEL":737.16,"PEAJE":258.7,"CXK":0.3,"CONDUCTOR":"EURORENTING","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"NOV 25'","AÑO":2025,"KM":2461.71,"FUEL":1400,"PEAJE":57.3,"CXK":0.57,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CBZ-888","MES":"NOV 25'","AÑO":2025,"KM":1947.66,"FUEL":364.87,"PEAJE":147.9,"CXK":0.19,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BYW-716","MES":"NOV 25'","AÑO":2025,"KM":2398.83,"FUEL":641.63,"PEAJE":172.5,"CXK":0.27,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"DIC 25'","AÑO":2025,"KM":1978.95,"FUEL":491.43,"PEAJE":52.8,"CXK":0.25,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"DIC 25'","AÑO":2025,"KM":2277.78,"FUEL":493.75,"PEAJE":137.8,"CXK":0.22,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"DIC 25'","AÑO":2025,"KM":2482.88,"FUEL":459.69,"PEAJE":106.8,"CXK":0.19,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYP-767","MES":"DIC 25'","AÑO":2025,"KM":500.37,"FUEL":100,"PEAJE":0,"CXK":0.2,"CONDUCTOR":"LUCAS ARANIBAR","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"DIC 25'","AÑO":2025,"KM":1994.95,"FUEL":800,"PEAJE":29.1,"CXK":0.4,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CFO-709","MES":"DIC 25'","AÑO":2025,"KM":2099.59,"FUEL":556.84,"PEAJE":131.6,"CXK":0.27,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"DIC 25'","AÑO":2025,"KM":1842.89,"FUEL":494.49,"PEAJE":112.2,"CXK":0.27,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYP-823","MES":"DIC 25'","AÑO":2025,"KM":2882.09,"FUEL":914.23,"PEAJE":171.2,"CXK":0.32,"CONDUCTOR":"JORGE DE LA CRUZ","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"DIC 25'","AÑO":2025,"KM":2724.63,"FUEL":560.22,"PEAJE":177.4,"CXK":0.21,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"DIC 25'","AÑO":2025,"KM":2997.74,"FUEL":396.72,"PEAJE":269,"CXK":0.13,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CFM-760","MES":"DIC 25'","AÑO":2025,"KM":3525.09,"FUEL":494.5,"PEAJE":151,"CXK":0.14,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"ENE 26'","AÑO":2026,"KM":2775.52,"FUEL":594.98,"PEAJE":282.2,"CXK":0.21,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CFO-709","MES":"ENE 26'","AÑO":2026,"KM":2740.21,"FUEL":683.77,"PEAJE":170.8,"CXK":0.25,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BYP-758","MES":"ENE 26'","AÑO":2026,"KM":3316.58,"FUEL":1031.88,"PEAJE":38.8,"CXK":0.31,"CONDUCTOR":"WILMER PEZO","TIPO":"MERCH"},{"PLACA":"BYP-823","MES":"ENE 26'","AÑO":2026,"KM":2099.91,"FUEL":750,"PEAJE":158,"CXK":0.36,"CONDUCTOR":"JORGE DE LA CRUZ","TIPO":"MERCH"},{"PLACA":"BYP-767","MES":"ENE 26'","AÑO":2026,"KM":2685.11,"FUEL":540,"PEAJE":92,"CXK":0.2,"CONDUCTOR":"LUCAS ARANIBAR","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"ENE 26'","AÑO":2026,"KM":2451.1,"FUEL":699.45,"PEAJE":72.2,"CXK":0.29,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"ENE 26'","AÑO":2026,"KM":2885.08,"FUEL":1600,"PEAJE":59,"CXK":0.55,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"ENE 26'","AÑO":2026,"KM":4062.85,"FUEL":457.27,"PEAJE":236.4,"CXK":0.11,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"CBZ-888","MES":"ENE 26'","AÑO":2026,"KM":1975.32,"FUEL":492.47,"PEAJE":72.6,"CXK":0.25,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"CFM-760","MES":"ENE 26'","AÑO":2026,"KM":4960.05,"FUEL":828.84,"PEAJE":291,"CXK":0.17,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"ENE 26'","AÑO":2026,"KM":3516.58,"FUEL":445.71,"PEAJE":203.4,"CXK":0.13,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"ENE 26'","AÑO":2026,"KM":2351.15,"FUEL":382.43,"PEAJE":112.2,"CXK":0.16,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"BYP-767","MES":"FEB 26'","AÑO":2026,"KM":2555.68,"FUEL":880,"PEAJE":89,"CXK":0.34,"CONDUCTOR":"LUCAS ARANIBAR","TIPO":"MERCH"},{"PLACA":"CFO-709","MES":"FEB 26'","AÑO":2026,"KM":2310.26,"FUEL":659.01,"PEAJE":89.2,"CXK":0.29,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"FEB 26'","AÑO":2026,"KM":2569.13,"FUEL":1350,"PEAJE":38.6,"CXK":0.53,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"FEB 26'","AÑO":2026,"KM":2903.94,"FUEL":585.69,"PEAJE":95.1,"CXK":0.2,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CBZ-888","MES":"FEB 26'","AÑO":2026,"KM":2754.91,"FUEL":533.09,"PEAJE":82.4,"CXK":0.19,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"FEB 26'","AÑO":2026,"KM":3391.91,"FUEL":611.28,"PEAJE":209.4,"CXK":0.18,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYP-823","MES":"FEB 26'","AÑO":2026,"KM":2215.36,"FUEL":850,"PEAJE":190.3,"CXK":0.38,"CONDUCTOR":"JORGE DE LA CRUZ","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"FEB 26'","AÑO":2026,"KM":2084.03,"FUEL":574.44,"PEAJE":259.6,"CXK":0.28,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"FEB 26'","AÑO":2026,"KM":2388.21,"FUEL":781.08,"PEAJE":32,"CXK":0.33,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYP-758","MES":"FEB 26'","AÑO":2026,"KM":2196.98,"FUEL":990.62,"PEAJE":57.7,"CXK":0.45,"CONDUCTOR":"WILMER PEZO","TIPO":"MERCH"},{"PLACA":"CDD-114","MES":"FEB 26'","AÑO":2026,"KM":2511.63,"FUEL":553.61,"PEAJE":209.4,"CXK":0.22,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CFM-760","MES":"FEB 26'","AÑO":2026,"KM":3845.16,"FUEL":688.93,"PEAJE":174.6,"CXK":0.18,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"CFO-709","MES":"MAR 26'","AÑO":2026,"KM":1867.77,"FUEL":1060.32,"PEAJE":97.9,"CXK":0.57,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"BYP-767","MES":"MAR 26'","AÑO":2026,"KM":2322.13,"FUEL":1120.07,"PEAJE":129.4,"CXK":0.48,"CONDUCTOR":"LUCAS ARANIBAR","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"MAR 26'","AÑO":2026,"KM":2997.08,"FUEL":1180.42,"PEAJE":329.1,"CXK":0.39,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"BYP-823","MES":"MAR 26'","AÑO":2026,"KM":659.53,"FUEL":890,"PEAJE":183.2,"CXK":1.35,"CONDUCTOR":"JORGE DE LA CRUZ","TIPO":"MERCH"},{"PLACA":"CFM-760","MES":"MAR 26'","AÑO":2026,"KM":2535.34,"FUEL":1325.98,"PEAJE":167.8,"CXK":0.52,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"MAR 26'","AÑO":2026,"KM":2136.07,"FUEL":1049.44,"PEAJE":63.5,"CXK":0.49,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYP-758","MES":"MAR 26'","AÑO":2026,"KM":2658.82,"FUEL":1154.18,"PEAJE":69.3,"CXK":0.43,"CONDUCTOR":"WILMER PEZO","TIPO":"MERCH"},{"PLACA":"BYW-754","MES":"MAR 26'","AÑO":2026,"KM":2600,"FUEL":1054.75,"PEAJE":215.2,"CXK":0.41,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BTW-750","MES":"MAR 26'","AÑO":2026,"KM":2907.48,"FUEL":2379.05,"PEAJE":31.5,"CXK":0.82,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"CDC-549","MES":"MAR 26'","AÑO":2026,"KM":2749.69,"FUEL":761.3,"PEAJE":114.4,"CXK":0.28,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"MAR 26'","AÑO":2026,"KM":2346.86,"FUEL":582.93,"PEAJE":254,"CXK":0.25,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CFM-856","MES":"MAR 26'","AÑO":2026,"KM":856.74,"FUEL":83.54,"PEAJE":0,"CXK":0.1,"CONDUCTOR":"EURORENTING","TIPO":"OPERACIONES"},{"PLACA":"BTW-750","MES":"ABR 26'","AÑO":2026,"KM":2567.05,"FUEL":2000,"PEAJE":31.5,"CXK":0.78,"CONDUCTOR":"VICENTE AGUILAR","TIPO":"OPERACIONES"},{"PLACA":"BYW-754","MES":"ABR 26'","AÑO":2026,"KM":2904.49,"FUEL":696.72,"PEAJE":240.9,"CXK":0.24,"CONDUCTOR":"JEAN FRANCO BALCAZAR","TIPO":"MERCH"},{"PLACA":"BYW-716","MES":"ABR 26'","AÑO":2026,"KM":1919.92,"FUEL":733.39,"PEAJE":47.5,"CXK":0.38,"CONDUCTOR":"JEAN HERRERA","TIPO":"MERCH"},{"PLACA":"BYW-700","MES":"ABR 26'","AÑO":2026,"KM":2294.22,"FUEL":579.51,"PEAJE":221,"CXK":0.25,"CONDUCTOR":"SERGIO RUBATTINI","TIPO":"MERCH"},{"PLACA":"CFO-709","MES":"ABR 26'","AÑO":2026,"KM":2556.74,"FUEL":750.55,"PEAJE":196.3,"CXK":0.29,"CONDUCTOR":"JOSE MONTES","TIPO":"MERCH"},{"PLACA":"CDC-549","MES":"ABR 26'","AÑO":2026,"KM":1182.03,"FUEL":264.84,"PEAJE":44.6,"CXK":0.22,"CONDUCTOR":"CHRIS HERRERA","TIPO":"OPERACIONES"},{"PLACA":"CBZ-888","MES":"ABR 26'","AÑO":2026,"KM":2678.36,"FUEL":983.19,"PEAJE":37.8,"CXK":0.37,"CONDUCTOR":"RAUL LUCERO","TIPO":"OPERACIONES"},{"PLACA":"CDD-114","MES":"ABR 26'","AÑO":2026,"KM":2541.66,"FUEL":600.4,"PEAJE":247.2,"CXK":0.24,"CONDUCTOR":"RENATO BRICEÑO","TIPO":"MERCH"},{"PLACA":"CFM-856","MES":"ABR 26'","AÑO":2026,"KM":1535.42,"FUEL":740.54,"PEAJE":72.7,"CXK":0.48,"CONDUCTOR":"EURORENTING","TIPO":"OPERACIONES"},{"PLACA":"CFM-760","MES":"ABR 26'","AÑO":2026,"KM":2075.69,"FUEL":847.47,"PEAJE":95.5,"CXK":0.41,"CONDUCTOR":"RONALD CARRERA","TIPO":"MERCH"}],"conductores":[{"CONDUCTOR":"CHRIS HERRERA","GAS":59.8,"GASOLINA":39.8,"DIESEL":0.2,"total":890},{"CONDUCTOR":"SERGIO RUBATTINI","GAS":61.5,"GASOLINA":38.5,"DIESEL":0,"total":820},{"CONDUCTOR":"JEAN HERRERA","GAS":75.5,"GASOLINA":24.5,"DIESEL":0,"total":681},{"CONDUCTOR":"RONALD CARRERA","GAS":26.3,"GASOLINA":73.7,"DIESEL":0,"total":596},{"CONDUCTOR":"JEAN FRANCO BALCAZAR","GAS":79.2,"GASOLINA":20.8,"DIESEL":0,"total":506},{"CONDUCTOR":"HAITEL SCHEMMEL","GAS":0,"GASOLINA":20.1,"DIESEL":79.9,"total":398},{"CONDUCTOR":"RUBEN OSORIO","GAS":20.8,"GASOLINA":79.2,"DIESEL":0,"total":298},{"CONDUCTOR":"JOSE MONTES","GAS":51.4,"GASOLINA":48.6,"DIESEL":0,"total":255},{"CONDUCTOR":"RENATO BRICEÑO","GAS":66,"GASOLINA":34,"DIESEL":0,"total":250},{"CONDUCTOR":"JOAN MANUEL SOTOMAYOR","GAS":77.1,"GASOLINA":22.9,"DIESEL":0,"total":249},{"CONDUCTOR":"EDINSON PEZO","GAS":19.1,"GASOLINA":76.7,"DIESEL":0,"total":236},{"CONDUCTOR":"JOSUE JARAMILLO","GAS":68.2,"GASOLINA":31.8,"DIESEL":0,"total":214},{"CONDUCTOR":"JOSE CUMPA","GAS":74.9,"GASOLINA":25.1,"DIESEL":0,"total":191},{"CONDUCTOR":"ORLANDO GARCIA","GAS":0,"GASOLINA":94.8,"DIESEL":0,"total":191},{"CONDUCTOR":"ALEJANDRO ROSAS","GAS":0,"GASOLINA":100,"DIESEL":0,"total":180},{"CONDUCTOR":"MARCO RAMIREZ","GAS":33.9,"GASOLINA":66.1,"DIESEL":0,"total":171},{"CONDUCTOR":"CARLOS MORALES","GAS":0,"GASOLINA":100,"DIESEL":0,"total":153},{"CONDUCTOR":"DAVID","GAS":5.3,"GASOLINA":94.7,"DIESEL":0,"total":150},{"CONDUCTOR":"FRANCO PEZO","GAS":72.6,"GASOLINA":27.4,"DIESEL":0,"total":146},{"CONDUCTOR":"JORGE DE LA CRUZ","GAS":41.5,"GASOLINA":58.5,"DIESEL":0,"total":123},{"CONDUCTOR":"VICENTE AGUILAR","GAS":0,"GASOLINA":0,"DIESEL":100,"total":88},{"CONDUCTOR":"MIGUEL QUINONEZ","GAS":0,"GASOLINA":100,"DIESEL":0,"total":87},{"CONDUCTOR":"WILMER PEZO","GAS":25,"GASOLINA":75,"DIESEL":0,"total":72},{"CONDUCTOR":"LUCAS ARANIBAR","GAS":1.7,"GASOLINA":98.3,"DIESEL":0,"total":59},{"CONDUCTOR":"LUIS AVILES","GAS":0,"GASOLINA":100,"DIESEL":0,"total":56},{"CONDUCTOR":"RAUL LUCERO","GAS":83.8,"GASOLINA":16.2,"DIESEL":0,"total":37},{"CONDUCTOR":"ENRIQUE AROSTEGUI","GAS":2.8,"GASOLINA":97.2,"DIESEL":0,"total":36},{"CONDUCTOR":"KEVIN ROJAS","GAS":4.3,"GASOLINA":95.7,"DIESEL":0,"total":23}]};
+
+// Sorted meses
+const MONTH_MAP={ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SET:9,OCT:10,NOV:11,DIC:12};
+function msKey(m){try{const p=String(m).replace("'","").trim().split(" ");return(parseInt(p[1])+2000)*100+MONTH_MAP[p[0].slice(0,3).toUpperCase()];}catch{return 0;}}
+const ALL_MESES=[...new Set(RAW.records.map(r=>r.MES))].sort((a,b)=>msKey(a)-msKey(b));
+const ALL_PLACAS=[...new Set(RAW.records.map(r=>r.PLACA))].filter(p=>p).sort();
+
+// ======================================================
+// FILTER STATE
+// ======================================================
+let F={year:'all',mes:'all',placa:'all',tipo:'all'};
+
+function getFiltered(){
+  return RAW.records.filter(r=>{
+    if(F.year!=='all'){
+      if(F.year==='2025-2026'&&!(r.AÑO===2025||r.AÑO===2026))return false;
+      else if(F.year==='2023-2026'&&r.AÑO<2023)return false;
+      else if(!['2025-2026','2023-2026'].includes(F.year)&&r.AÑO!==parseInt(F.year))return false;
+    }
+    if(F.mes!=='all'&&r.MES!==F.mes)return false;
+    if(F.placa!=='all'&&r.PLACA!==F.placa)return false;
+    if(F.tipo!=='all'&&r.TIPO!==F.tipo)return false;
+    return true;
+  });
+}
+
+function applyFilters(){
+  F.year=document.getElementById('f-year').value;
+  F.mes=document.getElementById('f-mes').value;
+  F.placa=document.getElementById('f-placa').value;
+  F.tipo=document.getElementById('f-tipo').value;
+  const fd=getFiltered();
+  document.getElementById('fi-n').textContent=fd.length;
+  redrawAll(fd);
+  // Sync vehicle selector
+  if(F.placa!=='all'){document.getElementById('v-sel').value=F.placa;updateVehicle();}
+}
+
+function resetFilters(){
+  ['f-year','f-mes','f-placa','f-tipo'].forEach(id=>document.getElementById(id).value='all');
+  F={year:'all',mes:'all',placa:'all',tipo:'all'};
+  applyFilters();
+}
+
+// ======================================================
+// HELPERS
+// ======================================================
+const C={ac:'#4af0a8',a2:'#f0a84a',a3:'#4a8af0',a4:'#f04a8a',mu:'#6b7280',bd:'#262c3a',tx:'#e8eaf2'};
+const baseAx={axisLine:{lineStyle:{color:C.bd}},axisTick:{lineStyle:{color:C.bd}},axisLabel:{color:C.mu,fontSize:10},splitLine:{lineStyle:{color:C.bd,type:'dashed'}}};
+const baseTip={backgroundColor:'#1a1e2a',borderColor:C.bd,textStyle:{color:C.tx,fontSize:11}};
+let CH={};
+function gc(id){if(CH[id])CH[id].dispose();const c=echarts.init(document.getElementById(id),null,{renderer:'canvas'});CH[id]=c;return c;}
+function fmt2(n){return Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function agg(data,keys,valFn){
+  const m={};data.forEach(r=>{const k=keys.map(x=>r[x]).join('|');if(!m[k])m[k]={};valFn(m[k],r);});return m;
+}
+
+// aggregate by MES
+function byMes(data){
+  const m={};
+  data.forEach(r=>{
+    if(!m[r.MES])m[r.MES]={km:0,fuel:0,peaje:0,sk:msKey(r.MES)};
+    m[r.MES].km+=r.KM;m[r.MES].fuel+=r.FUEL;m[r.MES].peaje+=r.PEAJE;
+  });
+  return Object.entries(m).sort((a,b)=>a[1].sk-b[1].sk).map(([mes,v])=>({mes,...v,cxk:v.km>0?+(v.fuel/v.km).toFixed(3):0}));
+}
+
+// ======================================================
+// DRAW FUNCTIONS
+// ======================================================
+function drawTrend(data){
+  const agg=byMes(data);
+  const meses=agg.map(d=>d.mes);
+  const c=gc('ch-trend');
+  c.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis',axisPointer:{type:'cross'}},
+    grid:{left:55,right:60,top:10,bottom:55},
+    xAxis:{type:'category',data:meses,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:35}},
+    yAxis:[{type:'value',...baseAx,name:'KM/S/',nameTextStyle:{color:C.mu,fontSize:9}},
+           {type:'value',...baseAx,position:'right',name:'S/xKM',nameTextStyle:{color:C.mu,fontSize:9},min:0,max:1.5}],
+    series:[
+      {name:'KM',type:'bar',data:agg.map(d=>Math.round(d.km)),yAxisIndex:0,barMaxWidth:28,itemStyle:{color:'rgba(74,240,168,0.28)',borderColor:C.ac,borderWidth:1}},
+      {name:'Combustible (S/)',type:'line',data:agg.map(d=>+d.fuel.toFixed(0)),yAxisIndex:0,lineStyle:{color:C.a2,width:2},itemStyle:{color:C.a2},symbol:'circle',symbolSize:4},
+      {name:'Costo/KM',type:'line',data:agg.map(d=>d.cxk),yAxisIndex:1,lineStyle:{color:C.a4,width:2,type:'dashed'},itemStyle:{color:C.a4},symbol:'diamond',symbolSize:5,smooth:true}
+    ]
+  });
+}
+
+function drawPie(data){
+  const tipos={MERCH:0,OPERACIONES:0,SUPERVISOR:0};
+  data.forEach(r=>{if(tipos[r.TIPO]!==undefined)tipos[r.TIPO]+=r.FUEL;});
+  const c=gc('ch-pie');
+  c.setOption({backgroundColor:'transparent',tooltip:{...baseTip},
+    legend:{textStyle:{color:C.mu,fontSize:10},orient:'vertical',right:5,top:'middle'},
+    series:[{name:'Tipo',type:'pie',radius:['38%','68%'],center:['40%','50%'],
+      data:[{value:+tipos.MERCH.toFixed(0),name:'MERCH',itemStyle:{color:C.ac}},
+            {value:+tipos.OPERACIONES.toFixed(0),name:'OPERACIONES',itemStyle:{color:C.a3}},
+            {value:+tipos.SUPERVISOR.toFixed(0),name:'SUPERVISOR',itemStyle:{color:C.a2}}],
+      label:{color:C.tx,fontSize:10},labelLine:{lineStyle:{color:C.mu}}
+    }]
+  });
+}
+
+function drawStack(data){
+  const mAll=byMes(data).map(d=>d.mes);
+  const tipos=['MERCH','OPERACIONES','SUPERVISOR'];
+  const tColors=[C.ac,C.a3,C.a2];
+  const byTM={};
+  data.forEach(r=>{if(!byTM[r.MES])byTM[r.MES]={};if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;byTM[r.MES][r.TIPO]+=r.FUEL;});
+  const c=gc('ch-stack');
+  c.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis',axisPointer:{type:'shadow'}},
+    legend:{textStyle:{color:C.mu,fontSize:9},top:0},
+    grid:{left:55,right:10,top:28,bottom:55},
+    xAxis:{type:'category',data:mAll,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:40}},
+    yAxis:{type:'value',...baseAx},
+    series:tipos.map((t,i)=>({name:t,type:'bar',stack:'s',barMaxWidth:28,itemStyle:{color:tColors[i]},
+      data:mAll.map(m=>+(byTM[m]?.[t]||0).toFixed(0))}))
+  });
+}
+
+function drawCxkLine(data){
+  const agg=byMes(data);
+  const c=gc('ch-cxk');
+  c.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis'},
+    grid:{left:50,right:10,top:10,bottom:55},
+    xAxis:{type:'category',data:agg.map(d=>d.mes),...baseAx,axisLabel:{...baseAx.axisLabel,rotate:35}},
+    yAxis:{type:'value',...baseAx,min:0},
+    series:[{name:'Costo/KM',type:'line',data:agg.map(d=>d.cxk),smooth:true,lineStyle:{color:C.a4,width:2},
+      itemStyle:{color:C.a4},areaStyle:{color:'rgba(240,74,138,0.08)'},symbol:'circle',symbolSize:4,
+      markLine:{data:[{type:'average',name:'Prom.'}],lineStyle:{color:C.a2},label:{color:C.a2,fontSize:9}}}]
+  });
+}
+
+function drawKpisResumen(data){
+  const km=data.reduce((s,r)=>s+r.KM,0);
+  const fuel=data.reduce((s,r)=>s+r.FUEL,0);
+  const peaje=data.reduce((s,r)=>s+r.PEAJE,0);
+  const cxk=km>0?fuel/km:0;
+  const placas=new Set(data.filter(r=>r.KM>0).map(r=>r.PLACA)).size;
+  const invs=data.filter(r=>r.FUEL>0).length;
+  document.getElementById('kpis-r').innerHTML=`
+    <div class="kcard" style="--kc:#4af0a8"><div class="klbl">KM Recorridos</div><div class="kval green">${Math.round(km).toLocaleString()}</div><div class="ksub">filtro activo</div></div>
+    <div class="kcard" style="--kc:#4a8af0"><div class="klbl">Gasto Combustible</div><div class="kval">S/ ${fmt2(fuel)}</div><div class="ksub">sin peajes</div></div>
+    <div class="kcard" style="--kc:#f0a84a"><div class="klbl">Total Peajes</div><div class="kval orange">S/ ${fmt2(peaje)}</div><div class="ksub">separado del cálculo</div></div>
+    <div class="kcard" style="--kc:#f04a8a"><div class="klbl">Costo/KM</div><div class="kval pink">S/ ${cxk.toFixed(3)}</div><div class="ksub">combustible ÷ KM</div></div>
+    <div class="kcard" style="--kc:#4af0a8"><div class="klbl">Registros</div><div class="kval">${data.length}</div><div class="ksub">filas placa×mes</div></div>
+    <div class="kcard" style="--kc:#4a8af0"><div class="klbl">Vehículos</div><div class="kval blue">${placas}</div><div class="ksub">con km registrados</div></div>`;
+}
+
+// Tipo trabajo tab
+function drawTipoLines(data){
+  const mAll=byMes(data).map(d=>d.mes);
+  const tipos=['MERCH','OPERACIONES','SUPERVISOR'];const tC=[C.ac,C.a3,C.a2];
+  const byTM={};data.forEach(r=>{if(!byTM[r.MES])byTM[r.MES]={};if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;byTM[r.MES][r.TIPO]+=r.FUEL;});
+  const c=gc('ch-t-lines');
+  c.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis'},legend:{textStyle:{color:C.mu,fontSize:9},top:0},
+    grid:{left:55,right:10,top:28,bottom:55},
+    xAxis:{type:'category',data:mAll,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:40}},
+    yAxis:{type:'value',...baseAx},
+    series:tipos.map((t,i)=>({name:t,type:'line',smooth:true,lineStyle:{color:tC[i],width:2},itemStyle:{color:tC[i]},symbol:'circle',symbolSize:3,
+      data:mAll.map(m=>+(byTM[m]?.[t]||0).toFixed(0))}))
+  });
+}
+
+function drawHeatmap(data){
+  const mAll=byMes(data).map(d=>d.mes);
+  const tipos=['MERCH','OPERACIONES','SUPERVISOR'];
+  const byTM={};data.forEach(r=>{if(!byTM[r.MES])byTM[r.MES]={};if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;byTM[r.MES][r.TIPO]+=r.FUEL;});
+  const hd=[];mAll.forEach((m,mi)=>tipos.forEach((t,ti)=>hd.push([mi,ti,Math.round(byTM[m]?.[t]||0)])));
+  const maxV=Math.max(...hd.map(d=>d[2]));
+  const c=gc('ch-heat');
+  c.setOption({backgroundColor:'transparent',
+    tooltip:{...baseTip,formatter:p=>`${mAll[p.data[0]]} · ${tipos[p.data[1]]}<br/>S/ ${p.data[2].toLocaleString()}`},
+    grid:{left:90,right:10,top:10,bottom:60},
+    xAxis:{type:'category',data:mAll,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:40}},
+    yAxis:{type:'category',data:tipos,...baseAx},
+    visualMap:{min:0,max:maxV,calculable:true,orient:'vertical',right:0,top:'middle',
+      inRange:{color:['#1a1e2a','#1e3a4a','#4af0a8']},textStyle:{color:C.mu,fontSize:9}},
+    series:[{type:'heatmap',data:hd}]
+  });
+}
+
+function drawTipoAvg(data){
+  const tipos=['MERCH','OPERACIONES','SUPERVISOR'];const tC=[C.ac,C.a3,C.a2];
+  const byTM={};data.forEach(r=>{if(!byTM[r.MES])byTM[r.MES]={};if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;byTM[r.MES][r.TIPO]+=r.FUEL;});
+  const mAll=Object.keys(byTM);
+  const avgs=tipos.map(t=>{const v=mAll.map(m=>byTM[m][t]||0).filter(x=>x>0);return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(0):0;});
+  const c=gc('ch-t-avg');
+  c.setOption({backgroundColor:'transparent',tooltip:{...baseTip},grid:{left:90,right:60,top:10,bottom:10},
+    xAxis:{type:'value',...baseAx},yAxis:{type:'category',data:tipos,...baseAx},
+    series:[{type:'bar',data:avgs,barMaxWidth:20,itemStyle:{color:p=>tC[p.dataIndex]},
+      label:{show:true,position:'right',formatter:p=>`S/ ${Number(p.value).toLocaleString()}`,color:C.mu,fontSize:9}}]
+  });
+}
+
+function fillTipoTable(data){
+  const mAll=byMes(data).map(d=>d.mes);
+  const tipos=['MERCH','OPERACIONES','SUPERVISOR'];
+  const byTM={};data.forEach(r=>{if(!byTM[r.MES])byTM[r.MES]={};if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;byTM[r.MES][r.TIPO]+=r.FUEL;});
+  const rows=[];mAll.forEach(m=>tipos.forEach(t=>{if(byTM[m]?.[t]>0)rows.push({m,t,v:byTM[m][t]});}));
+  document.getElementById('t-tbody').innerHTML=rows.map(r=>`<tr>
+    <td><span class="bdg ${r.t==='MERCH'?'bm':r.t==='OPERACIONES'?'bo':'bs'}">${r.t}</span></td>
+    <td style="color:${C.mu}">${r.m}</td>
+    <td><strong>S/ ${fmt2(r.v)}</strong></td>
+  </tr>`).join('');
+}
+
+// Conductores (static - always full data)
+function drawConductores(){
+  const conds=RAW.conductores;
+  const c1=gc('ch-c-fuel');
+  c1.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis',axisPointer:{type:'shadow'}},
+    legend:{textStyle:{color:C.mu,fontSize:9},top:0},
+    grid:{left:145,right:10,top:28,bottom:10},
+    xAxis:{type:'value',max:100,...baseAx,axisLabel:{...baseAx.axisLabel,formatter:v=>v+'%'}},
+    yAxis:{type:'category',data:conds.map(d=>d.CONDUCTOR),...baseAx,axisLabel:{...baseAx.axisLabel,fontSize:9}},
+    series:[
+      {name:'GNV (Gas)',type:'bar',stack:'s',data:conds.map(d=>d.GAS),itemStyle:{color:C.ac},barMaxWidth:16},
+      {name:'Gasolina',type:'bar',stack:'s',data:conds.map(d=>d.GASOLINA),itemStyle:{color:C.a2},barMaxWidth:16},
+      {name:'Diesel',type:'bar',stack:'s',data:conds.map(d=>d.DIESEL),itemStyle:{color:C.a3},barMaxWidth:16}
+    ]
+  });
+  const sorted=[...conds].sort((a,b)=>b.total-a.total);
+  const c2=gc('ch-c-count');
+  c2.setOption({backgroundColor:'transparent',tooltip:{...baseTip},
+    grid:{left:145,right:55,top:10,bottom:10},
+    xAxis:{type:'value',...baseAx},
+    yAxis:{type:'category',data:sorted.map(d=>d.CONDUCTOR),...baseAx,axisLabel:{...baseAx.axisLabel,fontSize:9}},
+    series:[{type:'bar',data:sorted.map(d=>d.total),barMaxWidth:16,
+      itemStyle:{color:new echarts.graphic.LinearGradient(1,0,0,0,[{offset:0,color:C.ac},{offset:1,color:'rgba(74,240,168,.25)'}])},
+      label:{show:true,position:'right',formatter:p=>p.value,color:C.mu,fontSize:9}}]
+  });
+  document.getElementById('cond-cards').innerHTML=conds.map(c=>`<div class="ccard2">
+    <div class="cn">${c.CONDUCTOR}</div>
+    <div class="cc">${c.total} facturas</div>
+    <div class="pbar"><div class="pgnv" style="width:${c.GAS}%"></div><div class="pgas" style="width:${c.GASOLINA}%"></div><div class="pdsl" style="width:${c.DIESEL}%"></div></div>
+    ${c.GAS>0?`<div class="frow"><span class="ftype">GNV (Gas)</span><span class="fpct-g">${c.GAS}%</span></div>`:''}
+    ${c.GASOLINA>0?`<div class="frow"><span class="ftype">Gasolina</span><span class="fpct-a">${c.GASOLINA}%</span></div>`:''}
+    ${c.DIESEL>0?`<div class="frow"><span class="ftype">Diesel</span><span class="fpct-d">${c.DIESEL}%</span></div>`:''}
+  </div>`).join('');
+}
+
+// Peajes
+function drawPeajes(data){
+  const ag=byMes(data);
+  const meses=ag.map(d=>d.mes);
+  const cp=gc('ch-p-trend');
+  cp.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis'},
+    grid:{left:55,right:10,top:10,bottom:55},
+    xAxis:{type:'category',data:meses,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:40}},
+    yAxis:{type:'value',...baseAx},
+    series:[{name:'Peajes',type:'bar',data:ag.map(d=>+d.peaje.toFixed(0)),barMaxWidth:28,
+      itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:C.a2},{offset:1,color:'rgba(240,168,74,.2)'}])},
+      markLine:{data:[{type:'average',name:'Prom.'}],lineStyle:{color:C.a4},label:{color:C.a4,fontSize:9}}}]
+  });
+  const cv=gc('ch-p-vs');
+  cv.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis',axisPointer:{type:'shadow'}},
+    legend:{textStyle:{color:C.mu,fontSize:9},top:0},
+    grid:{left:55,right:10,top:28,bottom:55},
+    xAxis:{type:'category',data:meses,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:40}},
+    yAxis:{type:'value',...baseAx},
+    series:[
+      {name:'Combustible',type:'bar',data:ag.map(d=>+d.fuel.toFixed(0)),barMaxWidth:16,itemStyle:{color:C.ac},barGap:'10%'},
+      {name:'Peajes',type:'bar',data:ag.map(d=>+d.peaje.toFixed(0)),barMaxWidth:16,itemStyle:{color:C.a2}}
+    ]
+  });
+  const totalP=data.reduce((s,r)=>s+r.PEAJE,0);
+  const totalF=data.reduce((s,r)=>s+r.FUEL,0);
+  const mn=ag.length>0?totalP/ag.length:0;
+  document.getElementById('kpis-p').innerHTML=`
+    <div class="kcard" style="--kc:#f0a84a"><div class="klbl">Total Peajes</div><div class="kval orange">S/ ${fmt2(totalP)}</div><div class="ksub">filtro activo</div></div>
+    <div class="kcard" style="--kc:#4af0a8"><div class="klbl">Promedio Mensual</div><div class="kval green">S/ ${fmt2(mn)}</div><div class="ksub">filtro activo</div></div>
+    <div class="kcard" style="--kc:#4a8af0"><div class="klbl">Combustible Total</div><div class="kval blue">S/ ${fmt2(totalF)}</div><div class="ksub">base para costo/km</div></div>`;
+}
+
+// Vehicle
+function updateVehicle(){
+  const placa=document.getElementById('v-sel').value;
+  if(!placa)return;
+  const pd=RAW.records.filter(r=>r.PLACA===placa&&(F.year==='all'||(F.year==='2025-2026'&&(r.AÑO===2025||r.AÑO===2026))||(F.year==='2023-2026'&&r.AÑO>=2023)||r.AÑO===parseInt(F.year)));
+  const ordered=pd.sort((a,b)=>msKey(a.MES)-msKey(b.MES));
+  const periods=[...new Set(ordered.map(r=>r.MES))];
+  const kmD=periods.map(m=>{const r=pd.filter(x=>x.MES===m);return +(r.reduce((s,x)=>s+x.KM,0)).toFixed(0);});
+  const fD=periods.map(m=>+(pd.filter(x=>x.MES===m).reduce((s,x)=>s+x.FUEL,0)).toFixed(0));
+  const cxD=periods.map((m,i)=>kmD[i]>0?+(fD[i]/kmD[i]).toFixed(3):0);
+  const totalKm=kmD.reduce((a,b)=>a+b,0);
+  const totalFuel=fD.reduce((a,b)=>a+b,0);
+  const avgCxk=cxD.filter(v=>v>0).reduce((a,b,_,arr)=>a+b/arr.length,0)||0;
+  const cond=[...new Set(pd.map(r=>r.CONDUCTOR).filter(c=>c))].join(', ')||'—';
+  document.getElementById('v-kpis').innerHTML=`
+    <div class="kcard" style="--kc:#4af0a8"><div class="klbl">KM Total</div><div class="kval green">${totalKm.toLocaleString()}</div></div>
+    <div class="kcard" style="--kc:#f0a84a"><div class="klbl">Gasto</div><div class="kval orange">S/ ${totalFuel.toLocaleString()}</div></div>
+    <div class="kcard" style="--kc:#f04a8a"><div class="klbl">Costo/KM Prom.</div><div class="kval pink">S/ ${avgCxk.toFixed(3)}</div></div>
+    <div class="kcard" style="--kc:#4a8af0;grid-column:span 2"><div class="klbl">Conductor(es)</div><div class="kval" style="font-size:11px">${cond}</div></div>`;
+  const vc=gc('ch-v-cxk');
+  vc.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis'},
+    grid:{left:50,right:10,top:10,bottom:50},
+    xAxis:{type:'category',data:periods,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:35}},
+    yAxis:{type:'value',...baseAx,min:0},
+    series:[{name:'Costo/KM',type:'line',data:cxD,smooth:false,lineStyle:{color:C.a4,width:2},itemStyle:{color:C.a4},symbol:'circle',symbolSize:5,
+      markLine:{data:[{type:'average'}],lineStyle:{color:C.a2},label:{color:C.a2,fontSize:9}}}]
+  });
+  const vk=gc('ch-v-km');
+  vk.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis'},
+    grid:{left:55,right:10,top:10,bottom:55},
+    xAxis:{type:'category',data:periods,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:40}},
+    yAxis:{type:'value',...baseAx},
+    series:[{type:'bar',data:kmD,barMaxWidth:28,itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:C.ac},{offset:1,color:'rgba(74,240,168,.2)'}])}}]
+  });
+  const vf=gc('ch-v-fuel');
+  vf.setOption({backgroundColor:'transparent',tooltip:{...baseTip,trigger:'axis'},
+    grid:{left:55,right:10,top:10,bottom:55},
+    xAxis:{type:'category',data:periods,...baseAx,axisLabel:{...baseAx.axisLabel,rotate:40}},
+    yAxis:{type:'value',...baseAx},
+    series:[{type:'bar',data:fD,barMaxWidth:28,itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:C.a2},{offset:1,color:'rgba(240,168,74,.2)'}])}}]
+  });
+}
+
+function redrawAll(data){
+  drawKpisResumen(data);
+  drawTrend(data);
+  drawPie(data);
+  drawStack(data);
+  drawCxkLine(data);
+  if(document.getElementById('panel-trabajo').classList.contains('on')){
+    drawTipoLines(data);drawHeatmap(data);drawTipoAvg(data);fillTipoTable(data);
+  }
+  if(document.getElementById('panel-peajes').classList.contains('on')) drawPeajes(data);
+  if(document.getElementById('panel-vehiculos').classList.contains('on')&&document.getElementById('v-sel').value) updateVehicle();
+  Object.values(CH).forEach(c=>c.resize());
+}
+
+// ======================================================
+// TABS
+// ======================================================
+const TABS=['resumen','vehiculos','trabajo','conductores','peajes'];
+function setTab(tab){
+  TABS.forEach(t=>{
+    document.getElementById(`panel-${t}`).classList.toggle('on',t===tab);
+    document.querySelectorAll('.tb')[TABS.indexOf(t)].classList.toggle('on',t===tab);
+  });
+  const data=getFiltered();
+  if(tab==='trabajo'){drawTipoLines(data);drawHeatmap(data);drawTipoAvg(data);fillTipoTable(data);}
+  if(tab==='conductores')drawConductores();
+  if(tab==='peajes')drawPeajes(data);
+  if(tab==='vehiculos'&&document.getElementById('v-sel').value)updateVehicle();
+  setTimeout(()=>Object.values(CH).forEach(c=>c.resize()),50);
+}
+
+// ======================================================
+// INIT
+// ======================================================
+window.addEventListener('load',()=>{
+  // Populate MES filter
+  const ms=document.getElementById('f-mes');
+  ALL_MESES.forEach(m=>ms.innerHTML+=`<option value="${m}">${m}</option>`);
+  // Populate PLACA filters
+  const fp=document.getElementById('f-placa');
+  const vp=document.getElementById('v-sel');
+  ALL_PLACAS.forEach(p=>{fp.innerHTML+=`<option value="${p}">${p}</option>`;vp.innerHTML+=`<option value="${p}">${p}</option>`;});
+  // Initial draw
+  const data=getFiltered();
+  drawKpisResumen(data);drawTrend(data);drawPie(data);drawStack(data);drawCxkLine(data);
+  window.addEventListener('resize',()=>Object.values(CH).forEach(c=>c.resize()));
+});
+</script>
+</body>
+</html>
