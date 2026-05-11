@@ -251,7 +251,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-
     <div class="cc"><div class="ct">Precio Promedio por Galón</div><div class="cs">S/ / galón · promedio mensual</div><div id="ch-v-precio" style="height:210px"></div></div>
   </div>
   <div class="crow c2">
-    <div class="cc"><div class="ct">Gasto Combustible por Mes</div><div class="cs">S/ con IGV · sin peajes</div><div id="ch-v-fuel" style="height:210px"></div></div>
+    <div class="cc"><div class="ct">Gasto Combustible por Mes</div><div class="cs">S/ con IGV · desglose GNV / Gasolina / Diesel</div><div id="ch-v-fuel" style="height:210px"></div></div>
     <div class="cc"><div class="ct">Peajes por Mes</div><div class="cs">S/ · separado del costo/km</div><div id="ch-v-pje" style="height:210px"></div></div>
   </div>
 </div>
@@ -933,7 +933,67 @@ function renderVehicle(data){
 
   mkLine('ch-v-cxk',  cxD,  periods, C.a4, 'Costo/KM');
   mkLine('ch-v-km',   kmD,  periods, C.ac, 'KM',        true);
-  mkLine('ch-v-fuel', fD,   periods, C.a2, 'S/',        true);
+  // ── Gasto Combustible por tipo (GAS / GASOLINA / DIESEL) — stacked bar
+  // DB.tx_comb decoded fields: PLACA, MES, AÑO, TIPO, CONDUCTOR, FUEL_TYPE, FUEL, sort_key
+  const fuelTypes = ['GAS','GASOLINA','DIESEL'];
+  const ftColors  = {GAS:C.ac, GASOLINA:C.a2, DIESEL:C.a3};
+  const ftLabels  = {GAS:'GNV (Gas)', GASOLINA:'Gasolina', DIESEL:'Diesel'};
+
+  const txPlaca = DB.tx_comb.filter(r=>{
+    if(r.PLACA !== placa) return false;
+    if(F.yr  && r.AÑO !== parseInt(F.yr)) return false;
+    if(mesF2.length && !mesF2.includes(r.MES)) return false;
+    if(F.tipo && r.TIPO !== F.tipo) return false;
+    return true;
+  });
+
+  const fuelByType = {};
+  fuelTypes.forEach(ft=>{
+    fuelByType[ft] = periods.map(m=>
+      +txPlaca.filter(r=>r.MES===m && r.FUEL_TYPE===ft)
+              .reduce((s,r)=>s+(r.FUEL||0), 0).toFixed(2)  // use .FUEL not .F
+    );
+  });
+
+  const activeFT = fuelTypes.filter(ft=>fuelByType[ft].some(v=>v>0));
+
+  if(activeFT.length===0){
+    // fallback: show total as single bar (no fuel type breakdown available)
+    gc('ch-v-fuel').setOption({
+      backgroundColor:'transparent',tooltip:{...bTip,trigger:'axis'},
+      grid:{left:55,right:10,top:15,bottom:50},
+      xAxis:{type:'category',data:periods,...bAx,axisLabel:{...bAx.axisLabel,rotate:35}},
+      yAxis:{type:'value',...bAx},
+      series:[{name:'Combustible',type:'bar',data:fD,barMaxWidth:32,
+        itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:C.a2},{offset:1,color:C.a2+'33'}])},
+        label:{show:true,position:'top',fontSize:8,color:C.a2,formatter:p=>p.value>0?fmt(p.value):''}}]
+    });
+  } else {
+    gc('ch-v-fuel').setOption({
+      backgroundColor:'transparent',
+      tooltip:{...bTip,trigger:'axis',axisPointer:{type:'shadow'},
+        formatter:params=>{
+          let h=`<b>${params[0]?.axisValueLabel}</b><br/>`;
+          let tot=0;
+          params.forEach(p=>{if(p.value>0){h+=`<span style="color:${p.color}">●</span> ${p.seriesName}: <b>S/ ${fmt2(p.value)}</b><br/>`;tot+=p.value;}});
+          if(params.length>1&&tot>0) h+=`<b>Total: S/ ${fmt2(tot)}</b>`;
+          return h;
+        }},
+      legend:{textStyle:{color:C.mu,fontSize:9},top:0,right:0},
+      grid:{left:55,right:10,top:28,bottom:50},
+      xAxis:{type:'category',data:periods,...bAx,axisLabel:{...bAx.axisLabel,rotate:35}},
+      yAxis:{type:'value',...bAx},
+      series: activeFT.map(ft=>({
+        name: ftLabels[ft],
+        type:'bar', stack:'fuel',
+        barMaxWidth:32,
+        itemStyle:{color:ftColors[ft]},
+        label:{show:true,position:'inside',fontSize:8,color:'#0d0f14',
+          formatter:p=>p.value>0?fmt(p.value):''},
+        data: fuelByType[ft]
+      }))
+    });
+  }
   mkLine('ch-v-pje',  pjeD, periods, C.a2, 'Peajes S/', true);
 
   // ── 7. Precio promedio chart — one line per fuel type
