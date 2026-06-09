@@ -602,14 +602,44 @@ function byMes(data){
 
 // ── YoY ──
 function drawYoY(data){
+  // When tipo or placa filter active, use tx_comb for fuel so TIPO is from LIQ sheet
+  const mesF=F.mes;
+  const needTx = F.tipo || F.placa || F.activeOnly;
+  const txYoY = needTx ? DB.tx_comb.filter(r=>{
+    if(F.activeOnly && !DB.active_plates.includes(r.PLACA)) return false;
+    if(F.yr    && r.AÑO !== parseInt(F.yr))   return false;
+    if(mesF.length && !mesF.includes(r.MES))  return false;
+    if(F.placa && r.PLACA !== F.placa)        return false;
+    if(F.tipo  && r.TIPO  !== F.tipo)         return false;
+    return true;
+  }) : null;
+
   const byYM={};
-  data.forEach(r=>{
-    const y=String(r.AÑO),l=r.month_label;
-    if(!l) return;
-    if(!byYM[y])byYM[y]={};
-    if(!byYM[y][l])byYM[y][l]={F:0,K:0};
-    byYM[y][l].F+=r.FUEL; byYM[y][l].K+=r.KM;
-  });
+  if(needTx && txYoY){
+    txYoY.forEach(r=>{
+      const y=String(r.AÑO),l=r.month_label;
+      if(!l) return;
+      if(!byYM[y])byYM[y]={};
+      if(!byYM[y][l])byYM[y][l]={F:0,K:0};
+      byYM[y][l].F+=(r.FUEL||0);
+    });
+    // KM from records (already filtered)
+    data.forEach(r=>{
+      const y=String(r.AÑO),l=r.month_label;
+      if(!l) return;
+      if(!byYM[y])byYM[y]={};
+      if(!byYM[y][l])byYM[y][l]={F:0,K:0};
+      byYM[y][l].K+=r.KM;
+    });
+  } else {
+    data.forEach(r=>{
+      const y=String(r.AÑO),l=r.month_label;
+      if(!l) return;
+      if(!byYM[y])byYM[y]={};
+      if(!byYM[y][l])byYM[y][l]={F:0,K:0};
+      byYM[y][l].F+=r.FUEL; byYM[y][l].K+=r.KM;
+    });
+  }
   const years=Object.keys(byYM).sort();
   const months=MONTH_ORDER.filter(l=>years.some(y=>byYM[y][l]));
   const metaLabel=yoyMetric==='F'?'S/ Combustible':yoyMetric==='K'?'KM Recorridos':'Costo/KM';
@@ -640,8 +670,12 @@ function setYoy(m,btn){yoyMetric=m;document.querySelectorAll('.ytb').forEach(b=>
 
 // ── PIE ──
 function drawPie(data){
+  // data can be tx_comb records (with FUEL field) or records (with FUEL field) — both work
   const tipos={MERCH:0,OPERACIONES:0,SUPERVISOR:0};
-  data.forEach(r=>{if(tipos[r.TIPO]!==undefined)tipos[r.TIPO]+=r.FUEL;});
+  data.forEach(r=>{
+    const t=r.TIPO||''; const f=r.FUEL||0;
+    if(tipos[t]!==undefined)tipos[t]+=f;
+  });
   const pieData=[
     {value:+tipos.MERCH.toFixed(0),name:'MERCH',itemStyle:{color:C.ac}},
     {value:+tipos.OPERACIONES.toFixed(0),name:'OPERACIONES',itemStyle:{color:C.a3}},
@@ -657,9 +691,17 @@ function drawPie(data){
 
 // ── STACKED BAR ──
 function drawStack(data){
-  const ag=byMes(data); const meses=ag.map(d=>d.mes);
+  // data = tx_comb filtered — has MES, TIPO, FUEL per invoice row
+  // Build byTM from tx_comb for correct TIPO breakdown
   const byTM={};
-  data.forEach(r=>{if(!byTM[r.MES])byTM[r.MES]={};if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;byTM[r.MES][r.TIPO]+=r.FUEL;});
+  data.forEach(r=>{
+    if(!byTM[r.MES])byTM[r.MES]={};
+    if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;
+    byTM[r.MES][r.TIPO]+=(r.FUEL||0);
+  });
+  const mesSet=new Set(data.map(r=>r.MES));
+  const meses=DB.all_meses.filter(m=>mesSet.has(m));
+  const ag=meses.map(m=>({mes:m}));
   const TIPOS=['MERCH','OPERACIONES','SUPERVISOR'];
   const TCLR=[C.ac,C.a3,C.a2];
   gc('ch-stack').setOption({
@@ -676,22 +718,46 @@ function drawStack(data){
 }
 
 // ── TREND ──
-function drawTrend(data){
-  const ag=byMes(data);
+function drawTrend(data, txF, pjeF){
+  // data=records (KM source), txF=tx_comb filtered (fuel source), pjeF=peaje_placa filtered
+  // When called without txF/pjeF (e.g. from other tabs), fall back to records
+  const useTx = txF && txF.length >= 0;
+
+  // Build by-mes aggregates
+  const kmByMes={}, fuelByMes={}, pjeByMes={};
+  data.forEach(r=>{
+    if(!kmByMes[r.MES])kmByMes[r.MES]={km:0,sk:r.sort_key};
+    kmByMes[r.MES].km+=r.KM;
+  });
+  if(useTx){
+    txF.forEach(r=>{if(!fuelByMes[r.MES])fuelByMes[r.MES]=0; fuelByMes[r.MES]+=(r.FUEL||0);});
+    if(pjeF) pjeF.forEach(r=>{if(!pjeByMes[r.MES])pjeByMes[r.MES]=0; pjeByMes[r.MES]+=(r.PEAJE||0);});
+  } else {
+    data.forEach(r=>{if(!fuelByMes[r.MES])fuelByMes[r.MES]=0; fuelByMes[r.MES]+=r.FUEL;});
+    data.forEach(r=>{if(!pjeByMes[r.MES])pjeByMes[r.MES]=0; pjeByMes[r.MES]+=r.PEAJE;});
+  }
+
+  const allMesSet=new Set([...Object.keys(kmByMes),...Object.keys(fuelByMes)]);
+  const meses=DB.all_meses.filter(m=>allMesSet.has(m));
+
+  const kmArr   = meses.map(m=>Math.round(kmByMes[m]?.km||0));
+  const fuelArr = meses.map(m=>+(fuelByMes[m]||0).toFixed(0));
+  const cxkArr  = meses.map((_,i)=>kmArr[i]>0?+(fuelArr[i]/kmArr[i]).toFixed(4):0);
+
   gc('ch-trend').setOption({
     backgroundColor:'transparent',tooltip:{...bTip,trigger:'axis',axisPointer:{type:'cross'}},
     grid:{left:55,right:60,top:10,bottom:55},
-    xAxis:{type:'category',data:ag.map(d=>d.mes),...bAx,axisLabel:{...bAx.axisLabel,rotate:35}},
+    xAxis:{type:'category',data:meses,...bAx,axisLabel:{...bAx.axisLabel,rotate:35}},
     yAxis:[{type:'value',...bAx,name:'S/',nameTextStyle:{color:C.mu,fontSize:9}},
            {type:'value',...bAx,position:'right',name:'S/km',nameTextStyle:{color:C.mu,fontSize:9},min:0}],
     series:[
-      {name:'KM',type:'bar',data:ag.map(d=>Math.round(d.km)),yAxisIndex:0,barMaxWidth:24,
+      {name:'KM',type:'bar',data:kmArr,yAxisIndex:0,barMaxWidth:24,
        itemStyle:{color:'rgba(74,240,168,.25)',borderColor:C.ac,borderWidth:1},
        label:{show:true,position:'top',fontSize:8,color:C.ac,formatter:p=>p.value>0?fmt(p.value):''}},
-      {name:'Comb (S/)',type:'line',data:ag.map(d=>+d.fuel.toFixed(0)),yAxisIndex:0,
+      {name:'Comb (S/)',type:'line',data:fuelArr,yAxisIndex:0,
        lineStyle:{color:C.a2,width:2},itemStyle:{color:C.a2},symbol:'circle',symbolSize:4,
        label:{show:true,fontSize:8,color:C.a2,formatter:p=>p.value>0?'S/'+fmt(p.value):'',position:'top'}},
-      {name:'C/KM',type:'line',data:ag.map(d=>d.cxk),yAxisIndex:1,
+      {name:'C/KM',type:'line',data:cxkArr,yAxisIndex:1,
        lineStyle:{color:C.a4,width:2,type:'dashed'},itemStyle:{color:C.a4},symbol:'diamond',symbolSize:5,smooth:true,
        label:{show:true,fontSize:8,color:C.a4,formatter:p=>p.value>0?p.value:'',position:'top'}}
     ]
@@ -760,11 +826,36 @@ function drawPivotTable(){
 
 // ── RESUMEN ──
 function renderResumen(data){
-  const km=data.reduce((s,r)=>s+r.KM,0);
-  const fuel=data.reduce((s,r)=>s+r.FUEL,0);
-  const peaje=data.reduce((s,r)=>s+r.PEAJE,0);
-  const cxk=km>0?fuel/km:0;
-  const plas=new Set(data.filter(r=>r.KM>0).map(r=>r.PLACA)).size;
+  // KPIs use each source with its own TIPO column to avoid cross-sheet mismatches:
+  //   FUEL  → DB.tx_comb  (TIPO from LIQUIDACIÓN COMBUSTIBLE)
+  //   KM    → DB.records  (TIPO from BBDD KM) — records already filtered
+  //   PEAJE → DB.peaje_placa (TIPO from PEAJE sheet)
+  const mesF = F.mes;
+
+  const txF = DB.tx_comb.filter(r=>{
+    if(F.activeOnly && !DB.active_plates.includes(r.PLACA)) return false;
+    if(F.yr    && r.AÑO !== parseInt(F.yr))        return false;
+    if(mesF.length && !mesF.includes(r.MES))       return false;
+    if(F.placa && r.PLACA !== F.placa)             return false;
+    if(F.tipo  && r.TIPO  !== F.tipo)              return false;
+    return true;
+  });
+
+  const pjeF = DB.peaje_placa.filter(r=>{
+    if(F.activeOnly && !DB.active_plates.includes(r.PLACA)) return false;
+    if(F.yr    && r.AÑO !== parseInt(F.yr))        return false;
+    if(mesF.length && !mesF.includes(r.MES))       return false;
+    if(F.placa && r.PLACA !== F.placa)             return false;
+    if(F.tipo  && r.TIPO  !== F.tipo)              return false;
+    return true;
+  });
+
+  const fuel  = txF.reduce((s,r)=>s+(r.FUEL||0), 0);
+  const peaje = pjeF.reduce((s,r)=>s+(r.PEAJE||0), 0);
+  const km    = data.reduce((s,r)=>s+r.KM, 0);  // KM from records (already filtered)
+  const cxk   = km>0 ? fuel/km : 0;
+  const plas  = new Set(data.filter(r=>r.KM>0).map(r=>r.PLACA)).size;
+
   document.getElementById('kpi-r').innerHTML=`
     <div class="kc" style="--kclr:#4af0a8"><div class="kl">KM Recorridos</div><div class="kv" style="color:var(--ac)">${fmt(km)}</div><div class="ks">filtro activo</div></div>
     <div class="kc" style="--kclr:#4a8af0"><div class="kl">Gasto Combustible</div><div class="kv">S/ ${fmt2(fuel)}</div><div class="ks">sin peajes</div></div>
@@ -772,7 +863,8 @@ function renderResumen(data){
     <div class="kc" style="--kclr:#f04a8a"><div class="kl">Costo/KM Combustible</div><div class="kv" style="color:var(--a4)">S/ ${cxk.toFixed(4)}</div><div class="ks">comb ÷ km (sin peajes)</div></div>
     <div class="kc" style="--kclr:#4af0a8"><div class="kl">Registros</div><div class="kv">${data.length}</div><div class="ks">placa × mes</div></div>
     <div class="kc" style="--kclr:#4a8af0"><div class="kl">Vehículos</div><div class="kv" style="color:var(--a3)">${plas}</div><div class="ks">con KM</div></div>`;
-  drawYoY(data); drawPie(data); drawStack(data); drawTrend(data); drawPivotTable();
+
+  drawYoY(data); drawPie(txF); drawStack(txF); drawTrend(data,txF,pjeF); drawPivotTable();
   const all=[...new Set(DB.records.map(r=>r.PLACA))].sort();
   document.getElementById('plates-leg').innerHTML=all.map(p=>`<span class="pbdg ${DB.active_plates.includes(p)?'pbdg-a':'pbdg-h'}">${p}</span>`).join('');
 }
@@ -1030,26 +1122,29 @@ function renderVehicle(data){
 
 // ── TIPO TRABAJO ──
 function renderTrabajo(data){
-  // CRITICAL: use DB.pivot_raw (sourced from LIQUIDACIÓN COMBUSTIBLE TIPO column)
-  // NOT data.records which has TIPO from KM sheet — those have 34 mismatches.
+  // Source: DB.tx_comb (from LIQUIDACIÓN COMBUSTIBLE) — has PLACA, TIPO, FUEL per invoice
+  // This correctly handles placa + tipo + mes + año filters simultaneously.
   const mesF = F.mes;
-  const pvtFiltered = DB.pivot_raw.filter(r=>{
-    if(F.yr   && r.AÑO !== parseInt(F.yr)) return false;
-    if(mesF.length && !mesF.includes(r.MES)) return false;
-    if(F.placa && !DB.records.filter(x=>x.PLACA===F.placa&&x.MES===r.MES).length) return false;
+
+  const txF = DB.tx_comb.filter(r=>{
+    if(F.activeOnly && !DB.active_plates.includes(r.PLACA)) return false;
+    if(F.yr    && r.AÑO !== parseInt(F.yr))        return false;
+    if(mesF.length && !mesF.includes(r.MES))       return false;
+    if(F.placa && r.PLACA !== F.placa)             return false;
+    if(F.tipo  && r.TIPO  !== F.tipo)              return false;
     return true;
   });
 
-  // Build byTM from pivot_raw: mes -> tipo -> fuel sum
+  // Build byTM: mes -> tipo -> fuel sum (using FUEL field from tx_comb)
   const byTM={};
-  pvtFiltered.forEach(r=>{
+  txF.forEach(r=>{
     if(!byTM[r.MES])byTM[r.MES]={};
     if(!byTM[r.MES][r.TIPO])byTM[r.MES][r.TIPO]=0;
-    byTM[r.MES][r.TIPO]+=r.FUEL;
+    byTM[r.MES][r.TIPO]+=(r.FUEL||0);
   });
 
-  // Sorted meses from pivot (chronological)
-  const mesSet=new Set(pvtFiltered.map(r=>r.MES));
+  // Sorted meses chronologically
+  const mesSet=new Set(txF.map(r=>r.MES));
   const meses=DB.all_meses.filter(m=>mesSet.has(m));
 
   const TIPOS=['MERCH','OPERACIONES','SUPERVISOR'];
