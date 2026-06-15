@@ -307,6 +307,47 @@ body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-
     <div class="cs">GNV · Gasolina · Diesel — con conductor principal</div>
     <div class="cgrid" id="cond-cards"></div>
   </div>
+
+  <!-- TABLA DETALLE -->
+  <div class="cc" style="margin-bottom:11px">
+    <div class="ct">Análisis Detallado — Volumen y Gasto por Placa</div>
+    <div class="cs">N° facturas y gasto S/ desglosado por tipo de combustible · filtro activo</div>
+    <div style="overflow-x:auto;margin-top:10px">
+      <table class="tbl" id="cond-detail-tbl" style="min-width:720px;font-size:11px">
+        <thead>
+          <tr>
+            <th rowspan="2" style="vertical-align:bottom;min-width:90px">Placa</th>
+            <th rowspan="2" style="vertical-align:bottom;min-width:130px">Conductor Principal</th>
+            <th rowspan="2" style="text-align:right;vertical-align:bottom">Facturas</th>
+            <th colspan="3" style="text-align:center;color:var(--ac);border-bottom:1px solid var(--ac)">GNV (Gas)</th>
+            <th colspan="3" style="text-align:center;color:var(--a2);border-bottom:1px solid var(--a2)">Gasolina</th>
+            <th colspan="3" style="text-align:center;color:var(--a3);border-bottom:1px solid var(--a3)">Diesel</th>
+            <th rowspan="2" style="text-align:right;vertical-align:bottom">Total S/</th>
+          </tr>
+          <tr>
+            <th style="text-align:right;color:var(--ac)">N°</th>
+            <th style="text-align:right;color:var(--ac)">S/</th>
+            <th style="text-align:right;color:var(--ac)">%</th>
+            <th style="text-align:right;color:var(--a2)">N°</th>
+            <th style="text-align:right;color:var(--a2)">S/</th>
+            <th style="text-align:right;color:var(--a2)">%</th>
+            <th style="text-align:right;color:var(--a3)">N°</th>
+            <th style="text-align:right;color:var(--a3)">S/</th>
+            <th style="text-align:right;color:var(--a3)">%</th>
+          </tr>
+        </thead>
+        <tbody id="cond-detail-body"></tbody>
+        <tfoot id="cond-detail-foot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- HALLAZGOS -->
+  <div class="cc" style="margin-bottom:11px">
+    <div class="ct">🔍 Hallazgos y Anomalías Detectadas</div>
+    <div class="cs">Análisis automático basado en los datos del filtro activo</div>
+    <div id="cond-insights" style="margin-top:10px"></div>
+  </div>
 </div>
 
 <!-- ══ PEAJES ══ -->
@@ -1261,6 +1302,8 @@ function renderConductores(){
     ${c.A>0?`<div class="frow2"><span class="plbl">Gasolina</span><span style="color:var(--a2);font-weight:700">${c.A}%</span></div>`:''}
     ${c.D>0?`<div class="frow2"><span class="plbl">Diesel</span><span style="color:var(--a3);font-weight:700">${c.D}%</span></div>`:''}
   </div>`).join('');
+  // Build detail table + insights
+  buildCondDetail(txF);
 }
 // resetCF removed — conductores now use global filters
 
@@ -1333,6 +1376,161 @@ function renderPeajes(data){
         label:{show:true,position:'top',fontSize:7,color:C.a2,formatter:p=>p.value>0?'S/'+fmt(p.value):''}}
     ]
   });
+}
+
+// ── CONDUCTOR DETAIL TABLE ──
+function buildCondDetail(txF) {
+  const map = {};
+  txF.forEach(r => {
+    const P = r.PLACA, G = r.FUEL_TYPE || 'SIN';
+    if (!map[P]) map[P] = { total_cnt:0, total_fuel:0, GAS:{cnt:0,fuel:0}, GASOLINA:{cnt:0,fuel:0}, DIESEL:{cnt:0,fuel:0}, conductores:{} };
+    map[P].total_cnt  += r.cnt;
+    map[P].total_fuel += (r.FUEL||0);
+    if (map[P][G]) { map[P][G].cnt += r.cnt; map[P][G].fuel += (r.FUEL||0); }
+    // Track conductor by invoice count
+    const cond = r.CONDUCTOR || r.N || '—';
+    if (cond && cond !== '—') map[P].conductores[cond] = (map[P].conductores[cond]||0) + r.cnt;
+  });
+
+  const rows = Object.entries(map)
+    .map(([P,v]) => {
+      // Pick main conductor (most invoices), fallback to DB.hist
+      let mainCond = Object.entries(v.conductores||{}).sort((a,b)=>b[1]-a[1])[0]?.[0] || '';
+      if (!mainCond) {
+        const hist = DB.hist.filter(h=>h.PLACA===P).sort((a,b)=>b.K-a.K)[0];
+        mainCond = hist ? hist.CONDUCTOR : '—';
+      }
+      return {P, mainCond, ...v};
+    })
+    .sort((a,b) => b.total_fuel - a.total_fuel);
+
+  if (!rows.length) {
+    document.getElementById('cond-detail-body').innerHTML =
+      '<tr><td colspan="10" style="color:var(--mu);text-align:center;padding:14px">Sin datos con el filtro activo</td></tr>';
+    document.getElementById('cond-detail-foot').innerHTML = '';
+    document.getElementById('cond-insights').innerHTML = '';
+    return;
+  }
+
+  const tot = rows.reduce((a,r) => ({
+    cnt: a.cnt+r.total_cnt, fuel: a.fuel+r.total_fuel,
+    gas_cnt: a.gas_cnt+r.GAS.cnt, gas_fuel: a.gas_fuel+r.GAS.fuel,
+    gaso_cnt: a.gaso_cnt+r.GASOLINA.cnt, gaso_fuel: a.gaso_fuel+r.GASOLINA.fuel,
+    dsl_cnt: a.dsl_cnt+r.DIESEL.cnt, dsl_fuel: a.dsl_fuel+r.DIESEL.fuel,
+  }), {cnt:0,fuel:0,gas_cnt:0,gas_fuel:0,gaso_cnt:0,gaso_fuel:0,dsl_cnt:0,dsl_fuel:0});
+
+  const badge = p => DB.active_plates.includes(p)
+    ? `<span class="pbdg pbdg-a">${p}</span>`
+    : `<span class="pbdg pbdg-h">${p}</span>`;
+
+  const minibar = (g,gs,d) => `<div style="display:flex;height:4px;border-radius:2px;overflow:hidden;background:var(--s2);margin-top:3px">
+    <div style="width:${g}%;background:var(--ac)"></div>
+    <div style="width:${gs}%;background:var(--a2)"></div>
+    <div style="width:${d}%;background:var(--a3)"></div></div>`;
+
+  document.getElementById('cond-detail-body').innerHTML = rows.map((r,i) => {
+    const gnvPct  = r.total_fuel>0 ? r.GAS.fuel/r.total_fuel*100 : 0;
+    const gasPct  = r.total_fuel>0 ? r.GASOLINA.fuel/r.total_fuel*100 : 0;
+    const dslPct  = r.total_fuel>0 ? r.DIESEL.fuel/r.total_fuel*100 : 0;
+    const pctFmt = (v,t) => t>0 ? `<span style="font-size:10px">${(v/t*100).toFixed(1)}%</span>` : '<span style="color:var(--bd)">—</span>';
+    return `<tr style="${i%2?'background:rgba(255,255,255,.02)':''}">
+      <td>${badge(r.P)}</td>
+      <td style="font-size:11px;color:var(--mu);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.mainCond}">${r.mainCond||'—'}</td>
+      <td style="text-align:right;font-weight:700">${r.total_cnt.toLocaleString()}</td>
+      <td style="text-align:right;color:var(--ac)">${r.GAS.cnt>0?r.GAS.cnt:'—'}</td>
+      <td style="text-align:right;color:var(--ac)">${r.GAS.fuel>0?'S/ '+fmt2(r.GAS.fuel):'—'}</td>
+      <td style="text-align:right;color:var(--ac)">${r.GAS.fuel>0?pctFmt(r.GAS.fuel,r.total_fuel):'—'}</td>
+      <td style="text-align:right;color:var(--a2)">${r.GASOLINA.cnt>0?r.GASOLINA.cnt:'—'}</td>
+      <td style="text-align:right;color:var(--a2)">${r.GASOLINA.fuel>0?'S/ '+fmt2(r.GASOLINA.fuel):'—'}</td>
+      <td style="text-align:right;color:var(--a2)">${r.GASOLINA.fuel>0?pctFmt(r.GASOLINA.fuel,r.total_fuel):'—'}</td>
+      <td style="text-align:right;color:var(--a3)">${r.DIESEL.cnt>0?r.DIESEL.cnt:'—'}</td>
+      <td style="text-align:right;color:var(--a3)">${r.DIESEL.fuel>0?'S/ '+fmt2(r.DIESEL.fuel):'—'}</td>
+      <td style="text-align:right;color:var(--a3)">${r.DIESEL.fuel>0?pctFmt(r.DIESEL.fuel,r.total_fuel):'—'}</td>
+      <td style="text-align:right;font-weight:800">
+        S/ ${fmt2(r.total_fuel)}
+        ${minibar(gnvPct,gasPct,dslPct)}
+      </td>
+    </tr>`;
+  }).join('');
+
+  const totGnvPct  = tot.fuel>0 ? (tot.gas_fuel /tot.fuel*100).toFixed(1)+'%' : '—';
+  const totGasPct  = tot.fuel>0 ? (tot.gaso_fuel/tot.fuel*100).toFixed(1)+'%' : '—';
+  const totDslPct  = tot.fuel>0 ? (tot.dsl_fuel /tot.fuel*100).toFixed(1)+'%' : '—';
+  document.getElementById('cond-detail-foot').innerHTML = `<tr style="background:var(--s3);font-weight:800;border-top:2px solid var(--bd)">
+    <td>TOTAL (${rows.length} placas)</td>
+    <td style="color:var(--mu);font-size:10px">${[...new Set(rows.map(r=>r.mainCond).filter(c=>c&&c!=='—'))].length} conductores</td>
+    <td style="text-align:right">${tot.cnt.toLocaleString()}</td>
+    <td style="text-align:right;color:var(--ac)">${tot.gas_cnt}</td>
+    <td style="text-align:right;color:var(--ac)">S/ ${fmt2(tot.gas_fuel)}</td>
+    <td style="text-align:right;color:var(--ac)">${totGnvPct}</td>
+    <td style="text-align:right;color:var(--a2)">${tot.gaso_cnt}</td>
+    <td style="text-align:right;color:var(--a2)">S/ ${fmt2(tot.gaso_fuel)}</td>
+    <td style="text-align:right;color:var(--a2)">${totGasPct}</td>
+    <td style="text-align:right;color:var(--a3)">${tot.dsl_cnt>0?tot.dsl_cnt:'—'}</td>
+    <td style="text-align:right;color:var(--a3)">${tot.dsl_fuel>0?'S/ '+fmt2(tot.dsl_fuel):'—'}</td>
+    <td style="text-align:right;color:var(--a3)">${tot.dsl_fuel>0?totDslPct:'—'}</td>
+    <td style="text-align:right;color:var(--ac)">S/ ${fmt2(tot.fuel)}</td>
+  </tr>`;
+
+  // ── INSIGHTS ──
+  const insights = [];
+  const fleetAvgPerFact = tot.fuel / tot.cnt;
+
+  // 1. Diesel plates
+  rows.filter(r=>r.DIESEL.fuel>0).forEach(r => {
+    insights.push({icon:'⚠️', color:'var(--a4)',
+      title:`${r.P} — Única placa con Diesel B5`,
+      text:`Consume ${(r.DIESEL.fuel/r.total_fuel*100).toFixed(1)}% Diesel (S/ ${fmt2(r.DIESEL.fuel)}, ${r.DIESEL.cnt} cargas). Es el gasto individual más alto de la flota activa. El Diesel tiene un costo por galón significativamente mayor que el GNV.`
+    });
+  });
+
+  // 2. Only gasoline — no GNV
+  const onlyGas = rows.filter(r=>r.GAS.fuel===0 && r.DIESEL.fuel===0 && r.total_fuel>500);
+  if (onlyGas.length) {
+    insights.push({icon:'💡', color:'var(--a2)',
+      title:`${onlyGas.map(r=>r.P).join(', ')} — Sin consumo de GNV`,
+      text:`Estas placas operan 100% con Gasolina. El GNV cuesta ~10x menos por galón (S/ 1.8 vs S/ 18). Evaluar conversión a bi-combustible puede generar ahorros de hasta 40–60% en costo de combustible.`
+    });
+  }
+
+  // 3. Highest GNV %
+  const topGnv = [...rows].filter(r=>r.GAS.fuel>0).sort((a,b)=>(b.GAS.fuel/b.total_fuel)-(a.GAS.fuel/a.total_fuel))[0];
+  if (topGnv) {
+    insights.push({icon:'✅', color:'var(--ac)',
+      title:`${topGnv.P} — Mayor uso de GNV (${(topGnv.GAS.fuel/topGnv.total_fuel*100).toFixed(1)}%)`,
+      text:`${topGnv.GAS.cnt} cargas de GNV (S/ ${fmt2(topGnv.GAS.fuel)}) vs ${topGnv.GASOLINA.cnt} de Gasolina (S/ ${fmt2(topGnv.GASOLINA.fuel)}). Referente de eficiencia en combustible.`
+    });
+  }
+
+  // 4. Highest volume
+  const topVol = [...rows].sort((a,b)=>b.total_cnt-a.total_cnt)[0];
+  const avgCnt = tot.cnt/rows.length;
+  if (topVol.total_cnt > avgCnt * 1.5) {
+    insights.push({icon:'📊', color:'var(--a3)',
+      title:`${topVol.P} — Mayor volumen: ${topVol.total_cnt.toLocaleString()} facturas`,
+      text:`${((topVol.total_cnt/avgCnt-1)*100).toFixed(0)}% más cargas que el promedio de la flota (${Math.round(avgCnt)} fact/placa). Puede indicar mayor actividad o cargas más frecuentes.`
+    });
+  }
+
+  // 5. Highest cost per invoice
+  rows.forEach(r => {
+    const avg = r.total_fuel/r.total_cnt;
+    if (avg > fleetAvgPerFact*1.8 && r.total_cnt>=10) {
+      insights.push({icon:'🔍', color:'var(--a2)',
+        title:`${r.P} — Costo promedio por factura elevado: S/ ${fmt2(avg)}`,
+        text:`La flota promedia S/ ${fmt2(fleetAvgPerFact)} por carga. Esta placa supera ese valor en ${((avg/fleetAvgPerFact-1)*100).toFixed(0)}%. Revisar si se deben a mayor volumen por carga o precios diferentes.`
+      });
+    }
+  });
+
+  if (!insights.length) insights.push({icon:'✅',color:'var(--ac)',title:'Sin anomalías destacables',text:'Los datos del filtro activo no presentan patrones inusuales.'});
+
+  document.getElementById('cond-insights').innerHTML = insights.map(ins=>`
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:var(--s2);border-radius:7px;border-left:3px solid ${ins.color};margin-bottom:8px">
+      <span style="font-size:18px;flex-shrink:0">${ins.icon}</span>
+      <div><div style="font-weight:700;font-size:12px;color:${ins.color};margin-bottom:3px">${ins.title}</div>
+      <div style="font-size:11px;color:var(--mu);line-height:1.6">${ins.text}</div></div>
+    </div>`).join('');
 }
 
 // ══════════════ TABS ══════════════
